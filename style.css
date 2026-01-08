@@ -57,6 +57,8 @@ body {
     display: flex;
     flex-direction: column;
     background: #ececec;
+    /* 允许内部各个 screen-view 处理自己的滚动 */
+    min-height: 0;
 }
 
 .phone-footer {
@@ -83,6 +85,7 @@ body {
     /* 每个屏幕自己负责内部纵向滚动 */
     overflow-y: auto;
     flex-direction: column;
+    min-height: 0;
 }
 
 .screen-view.active {
@@ -202,6 +205,8 @@ select:focus {
     display: flex;
     flex-direction: column;
     background: #ececec;
+    /* 允许内部聊天面板在 flex 布局下正常滚动 */
+    min-height: 0;
 }
 
 /* 微信内部导航：微信 / 通讯录 / 设置 */
@@ -210,11 +215,15 @@ select:focus {
     flex-direction: column;
     height: 100%;
     position: relative;
+    /* 防止内部内容把整个壳子撑高，影响底部导航栏 */
+    min-height: 0;
 }
 
 .wechat-pages {
     flex: 1;
     display: flex;
+    /* 允许内部各个 wechat-view 自己控制滚动 */
+    min-height: 0;
 }
 
 .wechat-nav-tabs {
@@ -246,6 +255,7 @@ select:focus {
     flex-direction: column;
     /* 由内部区域自己滚动，避免整个页面出现横向/纵向滚动条挤压输入框 */
     overflow: hidden;
+    min-height: 0;
     background: #ececec;
 }
 
@@ -317,6 +327,9 @@ select:focus {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    /* 让联系人 / 我的人设页面内容可以在内部滚动 */
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .contact-list,
@@ -488,6 +501,22 @@ select:focus {
     margin-bottom: 2px;
 }
 
+.memory-center {
+    margin-top: 12px;
+    padding: 10px 10px 12px;
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.memory-center h2 {
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
 .app-tabs {
     display: flex;
     border-bottom: 1px solid #dddddd;
@@ -523,6 +552,8 @@ select:focus {
 .panel-chat,
 .panel-feed {
     flex-direction: column;
+    /* 允许内部可滚动区域（如聊天列表）在 flex 布局下正常收缩并出现滚动条 */
+    min-height: 0;
 }
 
 .chat-list {
@@ -532,6 +563,29 @@ select:focus {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.quick-phrases {
+    padding: 4px 10px 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-top: 1px solid #e0e0e0;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f7f7f7;
+}
+
+.quick-phrase-btn {
+    border-radius: 14px;
+    border: 1px solid #d9d9d9;
+    padding: 2px 10px;
+    font-size: 11px;
+    background: #ffffff;
+    cursor: pointer;
+    max-width: 100%;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 /* 微信首页：会话列表 */
@@ -557,6 +611,10 @@ select:focus {
 
 .conversation-item.active {
     background: #e8f5e9;
+}
+
+.conversation-item.pinned {
+    background: #fff7e6;
 }
 
 .conversation-avatar {
@@ -602,7 +660,6 @@ select:focus {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
 .contact-signature {
     font-size: 12px;
     color: #999;
@@ -882,6 +939,7 @@ select:focus {
     .app {
         width: 100%;
         height: 100vh;
+        margin: 0 auto;
         border-radius: 0;
         box-shadow: none;
     }
@@ -956,6 +1014,30 @@ select:focus {
     cursor: pointer;
 }
 
+/* 聊天场景选择条 */
+.chat-scene-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    background: #f7f7f7;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.chat-scene-label {
+    color: #777;
+}
+
+.chat-scene-select {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid #d9d9d9;
+    font-size: 12px;
+}
+
 /* 聊天详情右上设置浮层 */
 .chat-profile-overlay {
     position: absolute;
@@ -1014,6 +1096,8 @@ select:focus {
     display: none;
     flex-direction: column;
     background: #f5f5f5;
+    /* 允许内部 moments-body / 列表滚动 */
+    min-height: 0;
 }
 
 .discover-view.active {
@@ -1133,4 +1217,58 @@ select:focus {
     display: flex;
     flex-direction: column;
     background: #f5f5f5;
+    /* 让 feed-list 有足够空间滚动 */
+    min-height: 0;
+}
+
+.listen-panel {
+    padding: 10px 12px 12px;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.listen-result {
+    min-height: 80px;
+    padding: 8px 10px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px dashed #e0e0e0;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.miniapp-section {
+    padding: 10px 12px 12px;
+}
+
+.miniapp-section h3 {
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.miniapp-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-radius: 6px;
+    border: 1px solid #e5e5e5;
+    overflow: hidden;
+}
+
+.miniapp-item {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.miniapp-item:last-child {
+    border-bottom: none;
+}
+
+.miniapp-item-disabled {
+    color: #999;
 }

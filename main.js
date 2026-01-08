@@ -22,7 +22,42 @@ const state = {
     lastAutoDiaryMsgCount: 0,
     // 当前正在编辑的用户人设 ID（用于“我”的人设编辑）
     editingUserProfileId: null,
+    // 当前会话场景（默认 / 学习 / 恋爱 / 工作 等）
+    currentSceneKey: "default",
 };
+
+// 预置的多场景模式列表（可按需扩展）
+const SCENE_PRESETS = [
+    {
+        key: "default",
+        name: "默认模式",
+        prompt: "",
+    },
+    {
+        key: "study",
+        name: "学习模式：一起学习/写作业",
+        prompt:
+            "当前场景是【学习模式】。请更专注、更条理清晰地解释知识、讲步骤、给示例，像一位耐心的学习伙伴，避免太多无关卖萌。",
+    },
+    {
+        key: "love",
+        name: "恋爱模式：甜甜恋人",
+        prompt:
+            "当前场景是【恋爱模式】。请在保证真诚和尊重的前提下，用更亲昵、温柔、关心对方感受的语气聊天，像一位贴心的恋人，但不要越界到现实中不合适的言行。",
+    },
+    {
+        key: "work",
+        name: "工作模式：同事/搭子",
+        prompt:
+            "当前场景是【工作模式】。请更偏向任务协作、效率和清晰结论，说话像靠谱的同事或合伙人，可以适度幽默但不要太撒娇。",
+    },
+];
+
+function getCurrentSceneConfig() {
+    return (
+        SCENE_PRESETS.find((s) => s.key === state.currentSceneKey) || SCENE_PRESETS[0]
+    );
+}
 
 // 当前正在进行操作的消息（用于长按菜单），不写入本地存储
 let currentMessageAction = null; // { charId, index }
@@ -142,6 +177,7 @@ function loadSettings() {
         renderDiary();
         syncSelectors();
         syncDiscoverAvatar();
+        syncMemoryCenterUI();
     } catch (e) {
         console.warn("加载本地设置失败", e);
     }
@@ -179,6 +215,7 @@ function internalSaveSettings(showAlert) {
     if (showAlert) {
         alert("已保存到本地（仅当前浏览器可见）");
     }
+    return cfg;
 }
 
 function saveSettings() {
@@ -187,6 +224,83 @@ function saveSettings() {
 
 function saveSettingsSilent() {
     internalSaveSettings(false);
+}
+
+function syncMemoryCenterUI() {
+    const box = $("memorySummaryInput");
+    if (box) box.value = state.memorySummary || "";
+}
+
+function exportData() {
+    const cfg = internalSaveSettings(false) || {};
+    const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        data: cfg,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const ts = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const name =
+        "aa-phone-backup-" +
+        ts.getFullYear() +
+        pad(ts.getMonth() + 1) +
+        pad(ts.getDate()) +
+        "-" +
+        pad(ts.getHours()) +
+        pad(ts.getMinutes()) +
+        pad(ts.getSeconds()) +
+        ".json";
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        URL.revokeObjectURL(url);
+        a.remove();
+    }, 0);
+}
+
+function importDataFromText(text) {
+    if (!text) return;
+    let obj;
+    try {
+        obj = JSON.parse(text);
+    } catch (e) {
+        alert("导入失败：不是合法的 JSON 文件。");
+        return;
+    }
+    const cfg = obj && typeof obj === "object" && obj.data ? obj.data : obj;
+    if (!cfg || typeof cfg !== "object") {
+        alert("导入失败：文件结构不符合预期。");
+        return;
+    }
+    if (!window.confirm("确定要导入吗？这会覆盖当前浏览器中的所有小手机数据。")) {
+        return;
+    }
+    if (!window.confirm("再次确认：导入后当前的聊天记录、朋友圈等将被替换。")) {
+        return;
+    }
+    try {
+        localStorage.setItem("aiChatSettings", JSON.stringify(cfg));
+    } catch (e) {
+        alert("写入本地存储失败，可能空间不足。");
+        return;
+    }
+    // 重新加载到内存并刷新界面
+    state.chars = [];
+    state.userProfiles = [];
+    state.sessions = {};
+    state.moments = [];
+    state.diary = [];
+    state.memorySummary = "";
+    state.memorySinceLastSummary = 0;
+    loadSettings();
+    alert("导入完成，当前浏览器的数据已更新。");
 }
 
 function exportData() {
@@ -307,6 +421,16 @@ function renderCharList() {
             syncSelectors();
             saveSettings();
         });
+        const btnPin = document.createElement("button");
+        btnPin.className = "btn secondary";
+        btnPin.textContent = c.pinned ? "取消常用" : "设为常用";
+        btnPin.addEventListener("click", () => {
+            c.pinned = !c.pinned;
+            renderCharList();
+            renderConversationList();
+            saveSettingsSilent();
+        });
+
         const btnDel = document.createElement("button");
         btnDel.className = "btn secondary";
         btnDel.textContent = "删除";
@@ -318,6 +442,7 @@ function renderCharList() {
             saveSettings();
         });
         actions.appendChild(btnUse);
+        actions.appendChild(btnPin);
         actions.appendChild(btnDel);
 
         li.appendChild(main);
@@ -476,17 +601,30 @@ function renderConversationList() {
     const listEl = $("conversationList");
     if (!listEl) return;
     listEl.innerHTML = "";
-    state.chars.forEach((c) => {
+    const chars = [...state.chars].sort((a, b) => {
+        const pa = a.pinned ? 1 : 0;
+        const pb = b.pinned ? 1 : 0;
+        if (pa !== pb) return pb - pa;
+        return 0;
+    });
+
+    chars.forEach((c) => {
         const session = getSession(c.id, false);
         const msgs = session ? session.messages : [];
         const last = msgs.length ? msgs[msgs.length - 1] : null;
         const item = document.createElement("div");
-        item.className = "conversation-item" + (c.id === getCurrentCharId() ? " active" : "");
+        const classes = ["conversation-item"];
+        if (c.id === getCurrentCharId()) classes.push("active");
+        if (c.pinned) classes.push("pinned");
+        item.className = classes.join(" ");
         item.addEventListener("click", () => {
             state.currentCharId = c.id;
+            // 切换好友时，默认回到“默认模式”场景
+            state.currentSceneKey = "default";
             syncSelectors();
             renderMessages();
             renderConversationList();
+            renderSceneSelector();
             updateChatDetailTitle();
             switchScreen("chat");
             switchWechatView("chatDetail");
@@ -695,7 +833,13 @@ function updateChatDetailTitle() {
     if (!titleEl) return;
     const id = getCurrentCharId();
     const currentChar = state.chars.find((c) => c.id === id) || null;
-    titleEl.textContent = currentChar?.name || "聊天";
+    const baseName = currentChar?.name || "聊天";
+    const scene = getCurrentSceneConfig();
+    if (scene && scene.key !== "default") {
+        titleEl.textContent = `${baseName} · ${scene.name.split("：")[0]}`;
+    } else {
+        titleEl.textContent = baseName;
+    }
 }
 
 function renderMoments() {
@@ -1008,6 +1152,25 @@ function switchWechatView(view) {
         if (k === activeTabKey) el.classList.add("active");
         else el.classList.remove("active");
     });
+
+    if (view === "chatDetail") {
+        renderSceneSelector();
+        updateChatDetailTitle();
+    }
+}
+
+function renderSceneSelector() {
+    const select = $("sceneSelect");
+    if (!select) return;
+    select.innerHTML = "";
+    SCENE_PRESETS.forEach((scene) => {
+        const opt = document.createElement("option");
+        opt.value = scene.key;
+        opt.textContent = scene.name;
+        select.appendChild(opt);
+    });
+    if (!state.currentSceneKey) state.currentSceneKey = "default";
+    select.value = state.currentSceneKey;
 }
 
 function openCharProfile(charId) {
@@ -1222,7 +1385,7 @@ async function maybeSummarizeMemory() {
                     },
                     { role: "user", content: text },
                 ],
-                max_tokens: 512,
+                max_tokens: 1024,
                 temperature: 0.3,
                 stream: false,
             }),
@@ -1234,6 +1397,7 @@ async function maybeSummarizeMemory() {
             state.memorySummary = summary.trim();
             state.memorySinceLastSummary = 0;
             // 顺便静默持久化一下摘要
+	    syncMemoryCenterUI();
 	    saveSettingsSilent();
         }
     } catch (e) {
@@ -1242,23 +1406,39 @@ async function maybeSummarizeMemory() {
 }
 
 async function sendToAI() {
-    const baseUrl = $("baseUrl").value.trim() || "https://api.openai.com/v1";
-    const customModel = $("modelCustom").value.trim();
+    const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
+    const currentUser =
+        state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
+
+    const baseUrl =
+        (currentChar && currentChar.baseUrl && currentChar.baseUrl.trim()) ||
+        $("baseUrl").value.trim() ||
+        "https://api.openai.com/v1";
+    const globalCustomModel = $("modelCustom").value.trim();
     const selectedModel = $("modelSelect").value;
-    const model = customModel || selectedModel || "gpt-4.1-mini";
+    const model =
+        (currentChar && currentChar.model && currentChar.model.trim()) ||
+        globalCustomModel ||
+        selectedModel ||
+        "gpt-4.1-mini";
     const apiKey = $("apiKey").value.trim();
-        const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
-        const currentUser =
-		state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
-        const roleName = currentChar?.name || "AI 助手";
-        const rolePersona = currentChar?.persona || "";
-        const userName = currentUser?.name || "";
-        const userPersona = currentUser?.persona || "";
+
+    const roleName = currentChar?.name || "AI 助手";
+    const rolePersona = currentChar?.persona || "";
+    const stylePrompt = currentChar?.stylePrompt || "";
+    const sceneCfg = getCurrentSceneConfig();
+    const userName = currentUser?.name || "";
+    const userPersona = currentUser?.persona || "";
 
     if (!apiKey) {
         alert("请先填写 API Key");
         return;
     }
+
+    const temperature =
+        typeof currentChar?.temperature === "number" && !Number.isNaN(currentChar.temperature)
+            ? currentChar.temperature
+            : 0.7;
 
     setSending(true);
 
@@ -1273,11 +1453,18 @@ async function sendToAI() {
                 state.memorySummary,
         });
     }
-    if (rolePersona) {
-        messages.push({
-            role: "system",
-            content: `你现在扮演一名名为「${roleName}」的 AI 助手，正在通过一个类似微信的在线聊天界面和用户对话。请始终以自然、友好的聊天语气回答。下面是你的详细人设设定：${rolePersona}`,
-        });
+    if (rolePersona || stylePrompt || (sceneCfg && sceneCfg.prompt)) {
+        let content = `你现在扮演一名名为「${roleName}」的 AI 助手，正在通过一个类似微信的在线聊天界面和用户对话。请始终以自然、友好的聊天语气回答。`;
+        if (rolePersona) {
+            content += `下面是你的详细人设设定：${rolePersona}`;
+        }
+        if (stylePrompt) {
+            content += `\n\n补充的说话风格提示：${stylePrompt}`;
+        }
+        if (sceneCfg && sceneCfg.key !== "default" && sceneCfg.prompt) {
+            content += `\n\n当前会话处于场景「${sceneCfg.name}」，请根据下面的场景说明调整你的表现：${sceneCfg.prompt}`;
+        }
+        messages.push({ role: "system", content });
     }
     if (userName || userPersona) {
         let up = "用户信息：";
@@ -1310,7 +1497,7 @@ async function sendToAI() {
                 // 为兼容部分第三方 OpenAI 接口，显式给出一些常见参数
                 // 提高 max_tokens，减少被截断的概率（具体上限受平台和模型限制）
                 max_tokens: 2048,
-                temperature: 0.7,
+                temperature,
                 stream: false,
             }),
         });
@@ -1401,16 +1588,26 @@ async function sendToAI() {
 }
 
 async function generateMoment(fromAuto = false) {
-    const baseUrl = $("baseUrl").value.trim() || "https://api.openai.com/v1";
-    const customModel = $("modelCustom").value.trim();
+    const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
+    const currentUser =
+        state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
+
+    const baseUrl =
+        (currentChar && currentChar.baseUrl && currentChar.baseUrl.trim()) ||
+        $("baseUrl").value.trim() ||
+        "https://api.openai.com/v1";
+    const globalCustomModel = $("modelCustom").value.trim();
     const selectedModel = $("modelSelect").value;
-    const model = customModel || selectedModel || "gpt-4.1-mini";
+    const model =
+        (currentChar && currentChar.model && currentChar.model.trim()) ||
+        globalCustomModel ||
+        selectedModel ||
+        "gpt-4.1-mini";
     const apiKey = $("apiKey").value.trim();
-        const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
-        const currentUser =
-		state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
         const roleName = currentChar?.name || "AI 助手";
         const rolePersona = currentChar?.persona || "";
+        const stylePrompt = currentChar?.stylePrompt || "";
+        const sceneCfg = getCurrentSceneConfig();
         const userName = currentUser?.name || "";
         const userPersona = currentUser?.persona || "";
     const hint = $("momentHint").value.trim();
@@ -1427,13 +1624,21 @@ async function generateMoment(fromAuto = false) {
         btn.textContent = "生成中…";
     }
 
-    try {
-        const messages = [];
-        if (rolePersona) {
-            messages.push({
-                role: "system",
-                content: `你现在扮演一名名为「${roleName}」的角色，请以第一人称在朋友圈发一条动态，内容和语气要符合下面的人设：${rolePersona}。只输出朋友圈正文，不要解释。`,
-            });
+	    try {
+	        const messages = [];
+	        if (rolePersona || stylePrompt || (sceneCfg && sceneCfg.prompt)) {
+            let content = `你现在扮演一名名为「${roleName}」的角色，请以第一人称在朋友圈发一条动态。`;
+            if (rolePersona) {
+                content += `内容和语气要符合下面的人设：${rolePersona}。`;
+            }
+            if (stylePrompt) {
+                content += `\n\n补充的说话风格提示：${stylePrompt}`;
+            }
+            if (sceneCfg && sceneCfg.key !== "default" && sceneCfg.prompt) {
+                content += `\n\n当前推荐使用的聊天场景是「${sceneCfg.name}」，请在写朋友圈时也尽量贴合这个场景：${sceneCfg.prompt}`;
+            }
+            content += "只输出朋友圈正文，不要解释。";
+            messages.push({ role: "system", content });
         }
         if (userName || userPersona) {
             let up = "用户信息：";
@@ -1471,7 +1676,11 @@ async function generateMoment(fromAuto = false) {
                 messages,
                 // 提高上限，减少被截断概率（仍受平台和模型限制）
                 max_tokens: 2048,
-                temperature: 0.8,
+                temperature:
+                    typeof currentChar?.temperature === "number" &&
+                    !Number.isNaN(currentChar.temperature)
+                        ? currentChar.temperature
+                        : 0.8,
                 stream: false,
             }),
         });
@@ -1523,16 +1732,26 @@ async function generateMoment(fromAuto = false) {
 }
 
 async function generateDiary(fromAuto = false) {
-    const baseUrl = $("baseUrl").value.trim() || "https://api.openai.com/v1";
-    const customModel = $("modelCustom").value.trim();
+    const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
+    const currentUser =
+        state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
+
+    const baseUrl =
+        (currentChar && currentChar.baseUrl && currentChar.baseUrl.trim()) ||
+        $("baseUrl").value.trim() ||
+        "https://api.openai.com/v1";
+    const globalCustomModel = $("modelCustom").value.trim();
     const selectedModel = $("modelSelect").value;
-    const model = customModel || selectedModel || "gpt-4.1-mini";
+    const model =
+        (currentChar && currentChar.model && currentChar.model.trim()) ||
+        globalCustomModel ||
+        selectedModel ||
+        "gpt-4.1-mini";
     const apiKey = $("apiKey").value.trim();
-        const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
-        const currentUser =
-		state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
         const roleName = currentChar?.name || "AI 助手";
         const rolePersona = currentChar?.persona || "";
+        const stylePrompt = currentChar?.stylePrompt || "";
+        const sceneCfg = getCurrentSceneConfig();
         const userName = currentUser?.name || "";
         const userPersona = currentUser?.persona || "";
     const hint = $("diaryHint").value.trim();
@@ -1549,13 +1768,21 @@ async function generateDiary(fromAuto = false) {
         btn.textContent = "生成中…";
     }
 
-    try {
-        const messages = [];
-        if (rolePersona) {
-            messages.push({
-                role: "system",
-                content: `你现在扮演一名名为「${roleName}」的角色，请用第一人称写一篇今天的日记，内容和语气要符合下面的人设：${rolePersona}。可以包含当天发生的事情和心情，只输出日记正文。`,
-            });
+	    try {
+	        const messages = [];
+	        if (rolePersona || stylePrompt || (sceneCfg && sceneCfg.prompt)) {
+            let content = `你现在扮演一名名为「${roleName}」的角色，请用第一人称写一篇今天的日记。`;
+            if (rolePersona) {
+                content += `内容和语气要符合下面的人设：${rolePersona}。`;
+            }
+            if (stylePrompt) {
+                content += `\n\n补充的说话风格提示：${stylePrompt}`;
+            }
+            if (sceneCfg && sceneCfg.key !== "default" && sceneCfg.prompt) {
+                content += `\n\n当前推荐使用的聊天场景是「${sceneCfg.name}」，请在写日记时也带上一点这个场景的氛围：${sceneCfg.prompt}`;
+            }
+            content += "可以包含当天发生的事情和心情，只输出日记正文。";
+            messages.push({ role: "system", content });
         }
         if (userName || userPersona) {
             let up = "用户信息：";
@@ -1593,7 +1820,11 @@ async function generateDiary(fromAuto = false) {
                 messages,
                 // 提高上限，减少被截断概率
                 max_tokens: 2048,
-                temperature: 0.7,
+                temperature:
+                    typeof currentChar?.temperature === "number" &&
+                    !Number.isNaN(currentChar.temperature)
+                        ? currentChar.temperature
+                        : 0.7,
                 stream: false,
             }),
         });
@@ -1775,10 +2006,17 @@ async function addCharCommentToMoment(index) {
     }
     ensureMomentStructure(m);
 
-    const baseUrl = $("baseUrl").value.trim() || "https://api.openai.com/v1";
-    const customModel = $("modelCustom").value.trim();
+    const baseUrl =
+        (currentChar && currentChar.baseUrl && currentChar.baseUrl.trim()) ||
+        $("baseUrl").value.trim() ||
+        "https://api.openai.com/v1";
+    const globalCustomModel = $("modelCustom").value.trim();
     const selectedModel = $("modelSelect").value;
-    const model = customModel || selectedModel || "gpt-4.1-mini";
+    const model =
+        (currentChar && currentChar.model && currentChar.model.trim()) ||
+        globalCustomModel ||
+        selectedModel ||
+        "gpt-4.1-mini";
     const apiKey = $("apiKey").value.trim();
     if (!apiKey) {
         alert("请先在设置里填写 API Key");
@@ -1787,6 +2025,7 @@ async function addCharCommentToMoment(index) {
 
     const roleName = currentChar.name || "AI 好友";
     const rolePersona = currentChar.persona || "";
+    const stylePrompt = currentChar.stylePrompt || "";
 
     try {
         const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
@@ -1802,19 +2041,22 @@ async function addCharCommentToMoment(index) {
                         role: "system",
                         content:
                             `你现在扮演名为「${roleName}」的朋友，请针对下面这条朋友圈内容，写一句很简短、自然的中文评论，像真实好友在朋友圈里回复那样，最多 30 个字。` +
-                            (rolePersona ? ` 角色人设：${rolePersona}` : ""),
+                            (rolePersona ? ` 角色人设：${rolePersona}` : "") +
+                            (stylePrompt ? ` 说话风格提示：${stylePrompt}` : ""),
                     },
                     {
                         role: "user",
                         content: m.content,
                     },
                 ],
-                max_tokens: 64,
+                max_tokens: 128,
                 temperature: 0.8,
                 stream: false,
             }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
         const data = await res.json();
         const text = extractAIContent(data) || "好有意思～";
         m.comments.push({
@@ -1842,11 +2084,24 @@ function openChatProfileOverlay() {
     const avatarInput = $("chatEditAvatar");
     const personaInput = $("chatEditPersona");
     const signatureInput = $("chatEditSignature");
+    const baseUrlInput = $("chatEditBaseUrl");
+    const modelInput = $("chatEditModel");
+    const tempInput = $("chatEditTemperature");
+    const styleInput = $("chatEditStyle");
     if (nameInput) nameInput.value = currentChar?.name || "";
     if (avatarInput)
         avatarInput.value = (currentChar?.avatar && String(currentChar.avatar)) || "";
     if (personaInput) personaInput.value = currentChar?.persona || "";
     if (signatureInput) signatureInput.value = currentChar?.signature || "";
+    if (baseUrlInput) baseUrlInput.value = currentChar?.baseUrl || "";
+    if (modelInput) modelInput.value = currentChar?.model || "";
+    if (tempInput)
+        tempInput.value =
+            typeof currentChar?.temperature === "number" &&
+            !Number.isNaN(currentChar.temperature)
+                ? String(currentChar.temperature)
+                : "";
+    if (styleInput) styleInput.value = currentChar?.stylePrompt || "";
 
     const userSelect = $("chatEditUserProfile");
     if (userSelect) {
@@ -1885,12 +2140,21 @@ function saveChatProfileFromOverlay() {
     const avatarInput = $("chatEditAvatar");
     const personaInput = $("chatEditPersona");
     const signatureInput = $("chatEditSignature");
+    const baseUrlInput = $("chatEditBaseUrl");
+    const modelInput = $("chatEditModel");
+    const tempInput = $("chatEditTemperature");
+    const styleInput = $("chatEditStyle");
     const userSelect = $("chatEditUserProfile");
 
     const name = nameInput ? nameInput.value.trim() : "";
     const avatar = avatarInput ? avatarInput.value.trim() : "";
     const persona = personaInput ? personaInput.value.trim() : "";
     const signature = signatureInput ? signatureInput.value.trim() : "";
+    const baseUrl = baseUrlInput ? baseUrlInput.value.trim() : "";
+    const model = modelInput ? modelInput.value.trim() : "";
+    const tempStr = tempInput ? tempInput.value.trim() : "";
+    const temperature = tempStr ? Number(tempStr) : NaN;
+    const stylePrompt = styleInput ? styleInput.value.trim() : "";
 
     const idx = state.chars.findIndex((c) => c.id === currentId);
     if (idx >= 0) {
@@ -1899,6 +2163,11 @@ function saveChatProfileFromOverlay() {
         ch.avatar = avatar;
         ch.persona = persona;
         ch.signature = signature;
+        ch.baseUrl = baseUrl || undefined;
+        ch.model = model || undefined;
+        if (!Number.isNaN(temperature)) ch.temperature = temperature;
+        else delete ch.temperature;
+        ch.stylePrompt = stylePrompt || undefined;
     }
 
     if (userSelect && userSelect.value) {
@@ -2020,6 +2289,17 @@ window.addEventListener("DOMContentLoaded", () => {
     	});
     }
 
+    const sceneSelectEl = $("sceneSelect");
+    if (sceneSelectEl) {
+        sceneSelectEl.addEventListener("change", (e) => {
+            const target = e.target;
+            const value = target && target.value ? String(target.value) : "default";
+            state.currentSceneKey = value || "default";
+            updateChatDetailTitle();
+        });
+        renderSceneSelector();
+    }
+
     switchApp("chat");
     switchScreen("home");
     bind("iconWechat", "click", () => {
@@ -2055,6 +2335,14 @@ window.addEventListener("DOMContentLoaded", () => {
             diary.classList.add("active");
         }
     });
+    bind("discoverListenEntry", "click", () => {
+        const home = $("discoverHome");
+        const listen = $("discoverListen");
+        if (home && listen) {
+            home.classList.remove("active");
+            listen.classList.add("active");
+        }
+    });
     bind("momentsBackBtn", "click", () => {
         const home = $("discoverHome");
         const moments = $("discoverMoments");
@@ -2071,6 +2359,14 @@ window.addEventListener("DOMContentLoaded", () => {
             home.classList.add("active");
         }
     });
+    bind("listenBackBtn", "click", () => {
+        const home = $("discoverHome");
+        const listen = $("discoverListen");
+        if (home && listen) {
+            listen.classList.remove("active");
+            home.classList.add("active");
+        }
+    });
 
     // 好友资料页按钮
     bind("profileBackBtn", "click", () => switchWechatView("home"));
@@ -2081,6 +2377,384 @@ window.addEventListener("DOMContentLoaded", () => {
         switchWechatView("chatDetail");
     });
     bind("profileEditBtn", "click", openChatProfileOverlay);
+
+    // 听一听：生成今日签 / 歌单文案
+    const listenResultEl = $("listenResult");
+    async function handleListen(type) {
+        const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
+        const currentUser =
+            state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
+        const baseUrl =
+            (currentChar && currentChar.baseUrl && currentChar.baseUrl.trim()) ||
+            $("baseUrl").value.trim() ||
+            "https://api.openai.com/v1";
+        const globalCustomModel = $("modelCustom").value.trim();
+        const selectedModel = $("modelSelect").value;
+        const model =
+            (currentChar && currentChar.model && currentChar.model.trim()) ||
+            globalCustomModel ||
+            selectedModel ||
+            "gpt-4.1-mini";
+        const apiKey = $("apiKey").value.trim();
+        const sceneCfg = getCurrentSceneConfig();
+
+        if (!apiKey) {
+            alert("请先填写 API Key");
+            return;
+        }
+        if (!currentChar) {
+            alert("请先在微信里选择一个好友再来听一听");
+            return;
+        }
+
+        const hint = ( $("listenHint")?.value || "" ).trim();
+
+        const btnId = type === "sign" ? "listenDailySignBtn" : "listenPlaylistBtn";
+        const btn = $(btnId);
+        const oldText = btn ? btn.textContent : "";
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = "生成中…";
+        }
+        if (listenResultEl) {
+            listenResultEl.textContent = "正在为你倾听最近的状态，生成中…";
+        }
+
+        try {
+            const messages = [];
+            const roleName = currentChar?.name || "AI 好友";
+            const rolePersona = currentChar?.persona || "";
+            const stylePrompt = currentChar?.stylePrompt || "";
+            const userName = currentUser?.name || "";
+            const userPersona = currentUser?.persona || "";
+
+            let sys = `你是一名名为「${roleName}」的 AI 好友，现在要在一个叫“听一听”的小程序里，给用户一段温柔的回应。`;
+            if (rolePersona) sys += `你的角色人设：${rolePersona}。`;
+            if (stylePrompt) sys += `说话风格提示：${stylePrompt}。`;
+            if (sceneCfg && sceneCfg.key !== "default" && sceneCfg.prompt) {
+                sys += `当前推荐场景是「${sceneCfg.name}」，场景说明：${sceneCfg.prompt}。`;
+            }
+            if (type === "sign") {
+                sys +=
+                    "你要输出一条『今日签』，用一小段文案安慰/鼓励/提醒用户，可以适度诗意，但不要太长，大约 2~5 句话。";
+            } else {
+                sys +=
+                    "你要输出一段『歌单文案』，像是为用户量身定制的一张歌单介绍，可以描述情绪、适合的场景和风格，同样控制在 2~5 句话。";
+            }
+            messages.push({ role: "system", content: sys });
+
+            if (userName || userPersona) {
+                let up = "用户信息：";
+                if (userName) up += `昵称为「${userName}」。`;
+                if (userPersona) up += `用户人设：${userPersona}`;
+                messages.push({ role: "system", content: up });
+            }
+
+            const history = getCurrentMessages(false).slice(-8);
+            if (history.length) {
+                const summary = history
+                    .map((m) => `${m.role === "user" ? "用户" : "你"}：${m.content}`)
+                    .join("\n");
+                messages.push({
+                    role: "system",
+                    content:
+                        "以下是最近几轮聊天的片段，帮助你感受当前的状态和情绪：\n" + summary,
+                });
+            }
+
+            if (hint) {
+                messages.push({
+                    role: "user",
+                    content: `这是用户在听一听里补充的心情/需求：${hint}`,
+                });
+            } else {
+                messages.push({
+                    role: "user",
+                    content:
+                        "请直接给我一条今日签或歌单文案（根据你所在的模式），不用和我闲聊，也不要解释规则。",
+                });
+            }
+
+            const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    max_tokens: 1024,
+                    temperature: 0.9,
+                    stream: false,
+                }),
+            });
+
+            let data;
+            if (!res.ok) {
+                // 尝试解析错误信息，方便定位平台侧问题（例如安全过滤或限额）
+                try {
+                    const errJson = await res.json();
+                    const msg = errJson?.error?.message || `HTTP ${res.status}`;
+                    throw new Error(msg);
+                } catch (e) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+            } else {
+                data = await res.json();
+            }
+
+            let content = extractAIContent(data) || "(AI 没有返回内容)";
+            // 标记可能被长度上限截断的情况
+            if (
+                Array.isArray(data?.choices) &&
+                data.choices.some(
+                    (ch) =>
+                        ch.finish_reason === "length" || ch.finish_reason === "max_tokens"
+                )
+            ) {
+                content +=
+                    "\n\n(提示：这段文案可能因为平台长度上限被截断，如果经常这样，可以在接口平台上提高单次输出上限，或把提示写得更精简一点。)";
+            }
+            if (listenResultEl) listenResultEl.textContent = content;
+        } catch (err) {
+            console.error(err);
+            if (listenResultEl)
+                listenResultEl.textContent = `生成失败：${err.message || err}`;
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = oldText;
+            }
+        }
+    }
+
+    bind("listenDailySignBtn", "click", () => handleListen("sign"));
+    bind("listenPlaylistBtn", "click", () => handleListen("playlist"));
+
+    // 小程序：塔罗占卜 & 情绪小测试
+    async function runMiniApp(type) {
+        const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
+        const currentUser =
+            state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
+        const baseUrl =
+            (currentChar && currentChar.baseUrl && currentChar.baseUrl.trim()) ||
+            $("baseUrl").value.trim() ||
+            "https://api.openai.com/v1";
+        const globalCustomModel = $("modelCustom").value.trim();
+        const selectedModel = $("modelSelect").value;
+        const model =
+            (currentChar && currentChar.model && currentChar.model.trim()) ||
+            globalCustomModel ||
+            selectedModel ||
+            "gpt-4.1-mini";
+        const apiKey = $("apiKey").value.trim();
+        const sceneCfg = getCurrentSceneConfig();
+
+        if (!apiKey) {
+            alert("请先填写 API Key");
+            return;
+        }
+        if (!currentChar) {
+            alert("请先在微信里选择一个好友再使用小程序");
+            return;
+        }
+
+        const hint = (($("listenHint")?.value || "") + "").trim();
+
+        const resultBox = $("listenResult");
+        if (resultBox) {
+            resultBox.textContent =
+                type === "tarot"
+                    ? "正在为你洗牌并抽一张纯娱乐的今日塔罗，占卜仅供开心玩耍…"
+                    : "正在感受你最近的状态，准备一份轻量的情绪小观察，仅供参考…";
+        }
+
+        // 本地兜底：即使远端接口返回 500，也给一个完全本地的娱乐结果
+        const localTarot = () => {
+            const deck = [
+                {
+                    name: "太阳 Sun",
+                    upright:
+                        "今天主打阳光和希望，适合把最近的小成果夸一夸，也别忘了奖励自己一点快乐。",
+                    reversed:
+                        "最近有点累，但云层后面还是有太阳。先把基础的生活节奏照顾好，你的能量会慢慢回来的。",
+                },
+                {
+                    name: "星星 Star",
+                    upright:
+                        "你心里藏着一个温柔的小愿望，今天可以往前迈半步，比如先写下一点点计划。",
+                    reversed:
+                        "也许你对未来有点迷茫，那就先点亮一颗小星星：做一件让自己安心的小事。",
+                },
+                {
+                    name: "力量 Strength",
+                    upright:
+                        "表面看起来很忙很累，其实你比自己想象的更有力量。记得温柔地对待自己，再继续出发。",
+                    reversed:
+                        "最近的消耗有点大，力量牌提醒你：适当撒娇、向别人求助，也是另一种勇气。",
+                },
+                {
+                    name: "恋人 Lovers",
+                    upright:
+                        "今天适合和重要的人好好说说心里话，哪怕只是一句“我在呢”，都会很暖。",
+                    reversed:
+                        "也许你在某个选择上有点犹豫，不必急着给出答案，先听听自己真正在意的是什么。",
+                },
+            ];
+            const card = deck[Math.floor(Math.random() * deck.length)];
+            const upright = Math.random() < 0.5;
+            const desc = upright ? card.upright : card.reversed;
+            return (
+                `今日抽到：${card.name}（${upright ? "正位" : "逆位"}）` +
+                "\n\n" +
+                desc +
+                "\n\n（本地娱乐版塔罗，仅供开心玩耍～）"
+            );
+        };
+
+        const localMood = () => {
+            const tags = [
+                "有点累但还在发光",
+                "认真生活的打工小英雄",
+                "情绪有起伏的敏感小天线",
+                "表面淡定、内心很有火花",
+            ];
+            const advices = [
+                "今天可以给自己安排一件完全不功利的小快乐，比如看一集喜欢的番、听一首循环很久的歌。",
+                "尝试把压力拆成几块小任务，一次只盯住最前面的那一小步，会轻松很多。",
+                "如果觉得闷，就找一个信任的人聊五分钟，不一定要有结论，只是把情绪放出来。",
+                "睡前可以写三件今天值得被肯定的小事，让大脑记住“我已经做得不错了”。",
+            ];
+            const tag = tags[Math.floor(Math.random() * tags.length)];
+            const pick = () => advices[Math.floor(Math.random() * advices.length)];
+            const used = new Set();
+            const getUnique = () => {
+                let v;
+                let guard = 0;
+                do {
+                    v = pick();
+                    guard += 1;
+                } while (used.has(v) && guard < 10);
+                used.add(v);
+                return v;
+            };
+            return (
+                `情绪标签：${tag}` +
+                "\n\n" +
+                "小观察：你其实比自己以为的更稳，只是最近的负担有点多，需要一点点喘息时间。" +
+                "\n\n" +
+                "小建议：\n- " +
+                getUnique() +
+                "\n- " +
+                getUnique() +
+                "\n\n（本地娱乐版情绪小测试，仅供参考～）"
+            );
+        };
+
+        try {
+            const messages = [];
+            const roleName = currentChar?.name || "AI 好友";
+            const rolePersona = currentChar?.persona || "";
+            const stylePrompt = currentChar?.stylePrompt || "";
+            const userName = currentUser?.name || "";
+            const userPersona = currentUser?.persona || "";
+
+            let sys = `你是一名名为「${roleName}」的 AI 好友，现在在一个『小程序』里陪用户玩一个轻松的娱乐小游戏。这些内容仅供放松和参考，不构成任何专业或医疗建议。`;
+            if (rolePersona) sys += `你的角色人设：${rolePersona}。`;
+            if (stylePrompt) sys += `说话风格提示：${stylePrompt}。`;
+            if (sceneCfg && sceneCfg.key !== "default" && sceneCfg.prompt) {
+                sys += `当前推荐场景是「${sceneCfg.name}」，场景说明：${sceneCfg.prompt}。`;
+            }
+            if (type === "tarot") {
+                sys +=
+                    "现在要进行『单张塔罗占卜（娱乐版）』：请你随机选择一张牌，可以使用常见塔罗牌或你自创的象征性牌名，给出牌名、正逆位（随机）、以及 3~5 句温柔的解读，聚焦当下和近期的小提示。不要涉及死亡、严重疾病等沉重主题，不要给出任何命运或现实保证，只是鼓励式的小故事。";
+            } else {
+                sys +=
+                    "现在要进行『情绪小测试（娱乐版）』：请根据用户最近的聊天状态，给出一个简短的情绪标签（例如“有点疲惫但乐观”），再用 3~5 句话描述当前情绪特征，并给出 2~3 条很具体、日常的小建议。不要使用任何心理诊断相关术语，不要暗示疾病或需要治疗，只用日常聊天语气安慰和鼓励。";
+            }
+            messages.push({ role: "system", content: sys });
+
+            if (userName || userPersona) {
+                let up = "用户信息：";
+                if (userName) up += `昵称为「${userName}」。`;
+                if (userPersona) up += `用户人设：${userPersona}`;
+                messages.push({ role: "system", content: up });
+            }
+
+            const history = getCurrentMessages(false).slice(-10);
+            if (history.length) {
+                const summary = history
+                    .map((m) => `${m.role === "user" ? "用户" : "你"}：${m.content}`)
+                    .join("\n");
+                messages.push({
+                    role: "system",
+                    content:
+                        "以下是最近几轮聊天的片段，只用来帮助你感受用户目前的状态，不要逐字复述：\n" +
+                        summary,
+                });
+            }
+
+            if (hint) {
+                messages.push({
+                    role: "user",
+                    content: `这是用户额外说的一点心情/背景：${hint}`,
+                });
+            }
+
+            const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    max_tokens: 512,
+                    temperature: 0.9,
+                    stream: false,
+                }),
+            });
+
+            let data;
+            if (!res.ok) {
+                try {
+                    const errJson = await res.json();
+                    const msg = errJson?.error?.message || `HTTP ${res.status}`;
+                    throw new Error(msg);
+                } catch (e) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+            } else {
+                data = await res.json();
+            }
+
+            let content = extractAIContent(data) || "(AI 没有返回内容)";
+            if (
+                Array.isArray(data?.choices) &&
+                data.choices.some(
+                    (ch) =>
+                        ch.finish_reason === "length" || ch.finish_reason === "max_tokens"
+                )
+            ) {
+                content +=
+                    "\n\n(提示：这段结果可能因为平台的长度上限被截断，如果经常这样，可以在接口平台上调整单次输出上限，或把玩法说明写得再简短一点。)";
+            }
+            if (resultBox) resultBox.textContent = content;
+        } catch (err) {
+            console.error("runMiniApp 远端调用失败，使用本地兜底结果", err);
+            if (!resultBox) return;
+            if (type === "tarot") {
+                resultBox.textContent = localTarot();
+            } else {
+                resultBox.textContent = localMood();
+            }
+        }
+    }
+
+    bind("miniAppTarotBtn", "click", () => runMiniApp("tarot"));
+    bind("miniAppMoodTestBtn", "click", () => runMiniApp("mood"));
 
     // 添加好友
     bind("addCharBtn", "click", () => {
@@ -2222,4 +2896,36 @@ window.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
+
+    // 聊天快捷短语
+    const quickBar = $("quickPhraseBar");
+    if (quickBar) {
+        const buttons = quickBar.querySelectorAll(".quick-phrase-btn[data-text]");
+        const input = $("userInput");
+        buttons.forEach((btn) => {
+            const text = btn.getAttribute("data-text") || "";
+            btn.addEventListener("click", () => {
+                if (!input) return;
+                input.value = text;
+                input.focus();
+            });
+        });
+    }
+
+    // 记忆管理中心按钮
+    bind("saveMemorySummaryBtn", "click", () => {
+        const box = $("memorySummaryInput");
+        if (box) {
+            state.memorySummary = box.value.trim();
+            state.memorySinceLastSummary = 0;
+            saveSettings();
+        }
+    });
+    bind("clearMemorySummaryBtn", "click", () => {
+        if (!window.confirm("确定清空 AI 记忆摘要吗？聊天记录本身不会被删除。")) return;
+        state.memorySummary = "";
+        state.memorySinceLastSummary = 0;
+        syncMemoryCenterUI();
+        saveSettings();
+    });
 });

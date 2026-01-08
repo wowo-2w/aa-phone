@@ -46,9 +46,19 @@
                                 <div id="chatDetailName" class="chat-detail-name"></div>
                                 <button id="chatProfileBtn" class="chat-profile-btn" title="编辑角色与人设">⋯</button>
                             </div>
+                            <div class="chat-scene-bar">
+                                <span class="chat-scene-label">场景</span>
+                                <select id="sceneSelect" class="chat-scene-select"></select>
+                            </div>
                             <section class="chat-area">
                                 <div id="panelChat" class="panel panel-chat panel-active">
                                     <div id="chatList" class="chat-list"></div>
+
+                                    <div class="quick-phrases" id="quickPhraseBar">
+                                        <button class="quick-phrase-btn" data-text="帮我总结一下今天的聊天内容，简短一点，用要点列出来。">总结今天</button>
+                                        <button class="quick-phrase-btn" data-text="请帮我写一条朋友圈，夸夸我今天的表现，用第一人称。">夸夸我</button>
+                                        <button class="quick-phrase-btn" data-text="请把我们刚才聊到的事情整理成 3～5 条待办清单。">整理成待办</button>
+                                    </div>
 
                                     <div class="input-area">
                                         <textarea id="userInput" rows="2" placeholder="发送消息…（Ctrl+Enter 换行，Enter 发送）"></textarea>
@@ -78,6 +88,22 @@
                                     <label class="form-item">
                                         <span>个性签名（资料页中展示，选填）</span>
                                         <input id="chatEditSignature" type="text" placeholder="例如：爱发朋友圈的小伙伴" />
+                                    </label>
+                                    <label class="form-item">
+                                        <span>专属 Base URL（选填，覆盖全局设置）</span>
+                                        <input id="chatEditBaseUrl" type="text" placeholder="例如：https://api.openai.com/v1 或 Gemini 的兼容地址" />
+                                    </label>
+                                    <label class="form-item">
+                                        <span>专属模型名（选填）</span>
+                                        <input id="chatEditModel" type="text" placeholder="例如：gpt-4.1-mini、gemini-pro 等" />
+                                    </label>
+                                    <label class="form-item">
+                                        <span>温度（选填，0~1，越高越活泼）</span>
+                                        <input id="chatEditTemperature" type="number" min="0" max="1" step="0.1" placeholder="默认 0.7" />
+                                    </label>
+                                    <label class="form-item">
+                                        <span>说话风格 / 语气提示</span>
+                                        <textarea id="chatEditStyle" rows="3" placeholder="例如：像恋爱向聊天、像温柔老师、像严肃教练等"></textarea>
                                     </label>
                                     <label class="form-item">
                                         <span>选择我的人设</span>
@@ -158,6 +184,11 @@
                                         <span class="discover-item-text">日记本</span>
                                         <span class="discover-item-arrow">›</span>
                                     </button>
+                                    <button id="discoverListenEntry" class="discover-item">
+                                        <span class="discover-item-icon">♪</span>
+                                        <span class="discover-item-text">听一听 / 小程序</span>
+                                        <span class="discover-item-arrow">›</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -198,6 +229,44 @@
                                     <p class="tip">后面我们可以在这里接更多 AI 小玩法，比如今日签、听一听等。</p>
                                 </div>
                             </div>
+                            <!-- 听一听 / 小程序入口与列表 -->
+                            <div id="discoverListen" class="discover-view">
+                                <div class="moments-header">
+                                    <button id="listenBackBtn" class="moments-back">〈 发现</button>
+                                    <div class="moments-title">听一听</div>
+                                </div>
+                                <div class="moments-body">
+                                    <div class="listen-panel">
+                                        <p class="tip">基于当前好友、人设和最近聊天，听一听今日一条小建议或歌单文案。</p>
+                                        <div class="form-row-inline">
+                                            <button id="listenDailySignBtn" class="btn primary">生成今日签</button>
+                                            <button id="listenPlaylistBtn" class="btn secondary">生成歌单文案</button>
+                                        </div>
+                                        <label class="form-item">
+                                            <span>补充一点想说的话（可选）</span>
+                                            <textarea id="listenHint" rows="2" placeholder="例如：最近有点丧 / 想听元气一点的歌"></textarea>
+                                        </label>
+                                        <div id="listenResult" class="listen-result"></div>
+                                    </div>
+                                    <div class="miniapp-section">
+                                        <h3>小程序（预留）</h3>
+                                        <ul id="miniAppList" class="miniapp-list">
+                                            <li class="miniapp-item">
+                                                <button id="miniAppTarotBtn" class="btn secondary" style="width:100%;text-align:left;justify-content:space-between;display:flex;align-items:center;">
+                                                    <span>塔罗占卜</span>
+                                                    <span style="font-size:12px;color:#999;">抽一张今日塔罗</span>
+                                                </button>
+                                            </li>
+                                            <li class="miniapp-item">
+                                                <button id="miniAppMoodTestBtn" class="btn secondary" style="width:100%;text-align:left;justify-content:space-between;display:flex;align-items:center;">
+                                                    <span>情绪小测试</span>
+                                                    <span style="font-size:12px;color:#999;">测一下现在的心情</span>
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- 我：用户人设 + 自动生成开关 -->
@@ -232,6 +301,19 @@
                                     <input id="autoDiary" type="checkbox" />
                                     <span>聊天后自动生成一篇日记</span>
                                 </label>
+                            </div>
+
+                            <div class="memory-center">
+                                <h2>记忆管理中心</h2>
+                                <label class="form-item">
+                                    <span>当前记忆摘要（可手动编辑）</span>
+                                    <textarea id="memorySummaryInput" rows="4" placeholder="这里会显示 AI 对你长期聊天的总结，用来让对话更连续。你也可以自己写或修改。"></textarea>
+                                </label>
+                                <div class="form-row-inline">
+                                    <button id="saveMemorySummaryBtn" class="btn primary">保存记忆修改</button>
+                                    <button id="clearMemorySummaryBtn" class="btn secondary">一键清空记忆</button>
+                                </div>
+                                <p class="tip">清空记忆会让 AI 忘记之前自动总结的长期信息，但不会删除聊天记录本身。</p>
                             </div>
                         </div>
                     </div>
