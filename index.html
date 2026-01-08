@@ -76,6 +76,10 @@
                                         <textarea id="chatEditPersona" rows="4" placeholder="为这个好友写一段人设说明"></textarea>
                                     </label>
                                     <label class="form-item">
+                                        <span>个性签名（资料页中展示，选填）</span>
+                                        <input id="chatEditSignature" type="text" placeholder="例如：爱发朋友圈的小伙伴" />
+                                    </label>
+                                    <label class="form-item">
                                         <span>选择我的人设</span>
                                         <select id="chatEditUserProfile"></select>
                                     </label>
@@ -83,6 +87,33 @@
                                         <button id="chatProfileCancelBtn" class="btn secondary">取消</button>
                                         <button id="chatProfileSaveBtn" class="btn primary">保存</button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                            <!-- 微信：好友资料页 -->
+                            <div id="wechatPageProfile" class="wechat-view">
+                            <div class="profile-detail-header">
+                                <button id="profileBackBtn" class="chat-back-btn">〈 微信</button>
+                                <div class="chat-detail-name">详细资料</div>
+                            </div>
+                            <div class="profile-detail-body">
+                                <div class="profile-detail-main">
+                                    <div class="profile-detail-avatar" id="profileDetailAvatar"></div>
+                                    <div class="profile-detail-name" id="profileDetailName"></div>
+                                    <div class="profile-detail-signature" id="profileDetailSignature"></div>
+                                </div>
+                                <div class="profile-detail-section">
+                                    <div class="profile-detail-label">角色人设</div>
+                                    <div class="profile-detail-text" id="profileDetailPersona"></div>
+                                </div>
+                                <div class="profile-detail-section">
+                                    <div class="profile-detail-label">标签</div>
+                                    <div class="profile-detail-text" id="profileDetailTags"></div>
+                                </div>
+                                <div class="profile-detail-actions">
+                                    <button id="profileChatBtn" class="btn primary">发消息</button>
+                                    <button id="profileEditBtn" class="btn secondary">编辑资料</button>
                                 </div>
                             </div>
                         </div>
@@ -97,6 +128,10 @@
                                 <label class="form-item">
                                     <span>好友昵称</span>
                                     <input id="newCharName" type="text" placeholder="例如：测试兔兔" />
+                                </label>
+                                <label class="form-item">
+                                    <span>个性签名（选填）</span>
+                                    <input id="newCharSignature" type="text" placeholder="例如：一只爱聊天的测试兔兔" />
                                 </label>
                                 <label class="form-item">
                                     <span>角色人设</span>
@@ -261,6 +296,16 @@
                     </label>
                     <button id="saveSettingsBtn" class="btn primary">保存设置（本机浏览器）</button>
                     <p class="tip">提示：设置会保存在当前浏览器的本地存储中，不会上传到服务器。</p>
+
+                    <h2>数据备份与恢复</h2>
+                    <div class="form-row-inline">
+                        <button id="exportDataBtn" class="btn secondary">导出数据（聊天 / 朋友圈 / 日记）</button>
+                    </div>
+                    <div class="form-row-inline">
+                        <button id="importDataBtn" class="btn secondary">从文件导入数据</button>
+                        <input id="importFile" type="file" accept="application/json" style="display:none" />
+                    </div>
+                    <p class="tip">导入会覆盖当前浏览器中的全部小手机数据，操作前请先导出备份。</p>
                 </aside>
             </div>
         </main>
@@ -268,6 +313,17 @@
         <footer class="phone-footer">
             <button id="btnHome" class="home-btn">◁ 主屏幕</button>
         </footer>
+        <!-- 消息长按操作菜单 -->
+        <div id="msgActionOverlay" class="msg-action-overlay">
+            <div class="msg-action-mask"></div>
+            <div class="msg-action-sheet">
+                <button class="msg-action-btn" data-action="copy">复制</button>
+                <button class="msg-action-btn" data-action="star">标为星标消息</button>
+                <button class="msg-action-btn" data-action="moment">从此生成朋友圈</button>
+                <button class="msg-action-btn msg-action-danger" data-action="delete">删除</button>
+                <button class="msg-action-btn msg-action-cancel" data-action="cancel">取消</button>
+            </div>
+        </div>
     </div>
 
     <script src="main.js"></script>

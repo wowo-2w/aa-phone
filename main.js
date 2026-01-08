@@ -24,6 +24,10 @@ const state = {
     editingUserProfileId: null,
 };
 
+// 当前正在进行操作的消息（用于长按菜单），不写入本地存储
+let currentMessageAction = null; // { charId, index }
+let messageLongPressTimer = null;
+
 function $(id) {
     return document.getElementById(id);
 }
@@ -185,6 +189,91 @@ function saveSettingsSilent() {
     internalSaveSettings(false);
 }
 
+function exportData() {
+    try {
+        // 先把当前内存状态静默写入本地，再读取一次作为导出内容
+        saveSettingsSilent();
+        const raw = localStorage.getItem("aiChatSettings") || "{}";
+        let data;
+        try {
+            data = JSON.parse(raw);
+        } catch (e) {
+            console.warn("解析本地配置失败", e);
+            data = {};
+        }
+        const payload = {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            data,
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+            type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const now = new Date();
+        const ts =
+            now.getFullYear().toString() +
+            String(now.getMonth() + 1).padStart(2, "0") +
+            String(now.getDate()).padStart(2, "0") +
+            "-" +
+            String(now.getHours()).padStart(2, "0") +
+            String(now.getMinutes()).padStart(2, "0");
+        a.download = `aa-phone-backup-${ts}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error(e);
+        alert("导出数据失败，可以查看控制台错误信息。");
+    }
+}
+
+function importDataFromText(text) {
+    let payload;
+    try {
+        payload = JSON.parse(text);
+    } catch (e) {
+        alert("选中的文件不是有效的 JSON 格式。");
+        return;
+    }
+
+    let cfg = null;
+    if (payload && typeof payload === "object" && payload.version && payload.data) {
+        cfg = payload.data;
+    } else if (payload && typeof payload === "object") {
+        cfg = payload;
+    }
+
+    if (!cfg || typeof cfg !== "object") {
+        alert("文件内容格式不符合预期，无法导入。");
+        return;
+    }
+
+    if (!cfg.sessions && !cfg.moments && !cfg.diary) {
+        const goOn = window.confirm(
+            "这个文件里好像没有对话 / 朋友圈 / 日记数据，仍然要导入并覆盖当前数据吗？"
+        );
+        if (!goOn) return;
+    }
+
+    const ok = window.confirm(
+        "导入会覆盖当前浏览器中的全部小手机数据（包括聊天记录、朋友圈、日记和配置），确定继续吗？"
+    );
+    if (!ok) return;
+
+    try {
+        localStorage.setItem("aiChatSettings", JSON.stringify(cfg));
+        alert("导入成功，页面将自动刷新。");
+        window.location.reload();
+    } catch (e) {
+        console.error(e);
+        alert("导入数据时出错，可以查看控制台错误信息。");
+    }
+}
+
 // 渲染角色（好友）和用户人设相关 UI
 function renderCharList() {
     const list = $("charList");
@@ -198,10 +287,14 @@ function renderCharList() {
         const name = document.createElement("div");
         name.className = "contact-name";
         name.textContent = c.name || "未命名好友";
+        const signature = document.createElement("div");
+        signature.className = "contact-signature";
+        signature.textContent = c.signature || "";
         const persona = document.createElement("div");
         persona.className = "contact-persona";
         persona.textContent = c.persona || "(未填写人设)";
         main.appendChild(name);
+        if (signature.textContent) main.appendChild(signature);
         main.appendChild(persona);
 
         const actions = document.createElement("div");
@@ -413,6 +506,11 @@ function renderConversationList() {
             avatar.textContent = avatarText;
         }
 
+        avatar.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            openCharProfile(c.id);
+        });
+
         const main = document.createElement("div");
         main.className = "conversation-main";
         const top = document.createElement("div");
@@ -449,21 +547,147 @@ function renderMessages() {
 
     const msgs = getCurrentMessages();
 
-    msgs.forEach((msg) => {
+    msgs.forEach((msg, index) => {
         if (msg.role !== "user" && msg.role !== "assistant") return;
         const item = document.createElement("div");
         item.className = `chat-item ${msg.role}`;
+
+        if (msg.starred) {
+            item.classList.add("starred");
+        }
+
+        item.dataset.index = String(index);
 
         const bubble = document.createElement("div");
         bubble.className = "bubble";
         bubble.textContent = msg.content;
 
         item.appendChild(bubble);
+        setupMessageGestureHandlers(item, index);
         listEl.appendChild(item);
     });
 
     // 滚动到底部
     listEl.scrollTop = listEl.scrollHeight;
+}
+
+function setupMessageGestureHandlers(item, index) {
+    const start = (e) => {
+        // 避免选中文本触发多余行为
+        e.stopPropagation();
+        if (messageLongPressTimer) {
+            clearTimeout(messageLongPressTimer);
+            messageLongPressTimer = null;
+        }
+        messageLongPressTimer = window.setTimeout(() => {
+            openMessageActionOverlay(index);
+        }, 500);
+    };
+
+    const cancel = () => {
+        if (messageLongPressTimer) {
+            clearTimeout(messageLongPressTimer);
+            messageLongPressTimer = null;
+        }
+    };
+
+    // 触摸长按
+    item.addEventListener("touchstart", start);
+    item.addEventListener("touchend", cancel);
+    item.addEventListener("touchmove", cancel);
+    item.addEventListener("touchcancel", cancel);
+
+    // 鼠标长按
+    item.addEventListener("mousedown", start);
+    item.addEventListener("mouseup", cancel);
+    item.addEventListener("mouseleave", cancel);
+
+    // 右键菜单快捷触发
+    item.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        openMessageActionOverlay(index);
+    });
+}
+
+function openMessageActionOverlay(index) {
+    const charId = getCurrentCharId();
+    const session = getSession(charId, false);
+    if (!session || !session.messages || !session.messages[index]) return;
+    currentMessageAction = { charId, index };
+    const overlay = $("msgActionOverlay");
+    if (overlay) overlay.classList.add("active");
+}
+
+function closeMessageActionOverlay() {
+    const overlay = $("msgActionOverlay");
+    if (overlay) overlay.classList.remove("active");
+    currentMessageAction = null;
+}
+
+async function handleMessageAction(action) {
+    if (!currentMessageAction) return;
+    const { charId, index } = currentMessageAction;
+    const session = getSession(charId, false);
+    if (!session || !Array.isArray(session.messages)) return;
+    const msgs = session.messages;
+    const msg = msgs[index];
+    if (!msg) return;
+
+    if (action === "cancel") {
+        closeMessageActionOverlay();
+        return;
+    }
+
+    try {
+        switch (action) {
+            case "copy": {
+                const text = msg.content || "";
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    alert("已复制到剪贴板");
+                } else {
+                    window.prompt("复制这条消息：", text);
+                }
+                break;
+            }
+            case "delete": {
+                msgs.splice(index, 1);
+                renderMessages();
+                renderConversationList();
+                saveSettingsSilent();
+                break;
+            }
+            case "star": {
+                msg.starred = !msg.starred;
+                renderMessages();
+                saveSettingsSilent();
+                break;
+            }
+            case "moment": {
+                const authorType = msg.role === "assistant" ? "char" : "user";
+                const authorId =
+                    authorType === "char" ? charId : state.currentUserProfileId || null;
+                state.moments.push({
+                    id: "moment_" + Date.now(),
+                    authorType,
+                    authorId,
+                    content: msg.content,
+                    time: new Date().toLocaleString(),
+                    likedByUser: false,
+                    likedByChars: [],
+                    comments: [],
+                });
+                renderMoments();
+                saveSettingsSilent();
+                alert("已从这条消息生成一条朋友圈，可以在“发现-朋友圈”里查看。");
+                break;
+            }
+            default:
+                break;
+        }
+    } finally {
+        closeMessageActionOverlay();
+    }
 }
 
 function updateChatDetailTitle() {
@@ -752,6 +976,7 @@ function switchWechatView(view) {
     const viewMap = {
         home: "wechatPageHome",
         chatDetail: "wechatPageChat",
+        profile: "wechatPageProfile",
         contacts: "wechatPageContacts",
         discover: "wechatPageDiscover",
         me: "wechatPageMe",
@@ -783,6 +1008,49 @@ function switchWechatView(view) {
         if (k === activeTabKey) el.classList.add("active");
         else el.classList.remove("active");
     });
+}
+
+function openCharProfile(charId) {
+    const id = charId || getCurrentCharId();
+    if (!id) {
+        alert("请先添加一个好友");
+        return;
+    }
+    const ch = state.chars.find((c) => c.id === id) || null;
+    if (!ch) {
+        alert("未找到该好友");
+        return;
+    }
+
+    const avatarBox = $("profileDetailAvatar");
+    const nameEl = $("profileDetailName");
+    const sigEl = $("profileDetailSignature");
+    const personaEl = $("profileDetailPersona");
+    const tagsEl = $("profileDetailTags");
+
+    if (avatarBox) {
+        avatarBox.innerHTML = "";
+        const raw = ch.avatar && String(ch.avatar).trim();
+        if (raw && isAvatarUrl(raw)) {
+            const img = document.createElement("img");
+            img.src = raw;
+            img.alt = ch.name || "头像";
+            avatarBox.appendChild(img);
+        } else {
+            avatarBox.textContent = (raw || ch.name || "?").charAt(0);
+        }
+    }
+    if (nameEl) nameEl.textContent = ch.name || "未命名好友";
+    if (sigEl) sigEl.textContent = ch.signature || "";
+    if (personaEl) personaEl.textContent = ch.persona || "(还没有为 TA 写人设)";
+    if (tagsEl) tagsEl.textContent = ch.tags || "";
+
+    // 记录当前好友，方便“发消息”按钮跳回
+    state.currentCharId = id;
+    syncSelectors();
+    updateChatDetailTitle();
+
+    switchWechatView("profile");
 }
 
 function setSending(sending) {
@@ -1520,8 +1788,6 @@ async function addCharCommentToMoment(index) {
     const roleName = currentChar.name || "AI 好友";
     const rolePersona = currentChar.persona || "";
 
-    const btnText = "TA评";
-
     try {
         const res = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
             method: "POST",
@@ -1575,9 +1841,12 @@ function openChatProfileOverlay() {
     const nameInput = $("chatEditName");
     const avatarInput = $("chatEditAvatar");
     const personaInput = $("chatEditPersona");
+    const signatureInput = $("chatEditSignature");
     if (nameInput) nameInput.value = currentChar?.name || "";
-    if (avatarInput) avatarInput.value = (currentChar?.avatar && String(currentChar.avatar)) || "";
+    if (avatarInput)
+        avatarInput.value = (currentChar?.avatar && String(currentChar.avatar)) || "";
     if (personaInput) personaInput.value = currentChar?.persona || "";
+    if (signatureInput) signatureInput.value = currentChar?.signature || "";
 
     const userSelect = $("chatEditUserProfile");
     if (userSelect) {
@@ -1592,9 +1861,6 @@ function openChatProfileOverlay() {
             state.currentUserProfileId &&
             state.userProfiles.some((p) => p.id === state.currentUserProfileId)
         ) {
-            userSelect.value = state.currentUserProfileId;
-        } else if (state.userProfiles[0]) {
-            state.currentUserProfileId = state.userProfiles[0].id;
             userSelect.value = state.currentUserProfileId;
         }
     }
@@ -1618,11 +1884,13 @@ function saveChatProfileFromOverlay() {
     const nameInput = $("chatEditName");
     const avatarInput = $("chatEditAvatar");
     const personaInput = $("chatEditPersona");
+    const signatureInput = $("chatEditSignature");
     const userSelect = $("chatEditUserProfile");
 
     const name = nameInput ? nameInput.value.trim() : "";
     const avatar = avatarInput ? avatarInput.value.trim() : "";
     const persona = personaInput ? personaInput.value.trim() : "";
+    const signature = signatureInput ? signatureInput.value.trim() : "";
 
     const idx = state.chars.findIndex((c) => c.id === currentId);
     if (idx >= 0) {
@@ -1630,6 +1898,7 @@ function saveChatProfileFromOverlay() {
         ch.name = name || ch.name || "未命名好友";
         ch.avatar = avatar;
         ch.persona = persona;
+        ch.signature = signature;
     }
 
     if (userSelect && userSelect.value) {
@@ -1708,6 +1977,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     bind("saveSettingsBtn", "click", saveSettings);
+    bind("exportDataBtn", "click", exportData);
     bind("sendBtn", "click", handleSend);
     bind("fetchModelsBtn", "click", fetchModels);
     bind("askBtn", "click", handleAskAI);
@@ -1764,6 +2034,7 @@ window.addEventListener("DOMContentLoaded", () => {
         switchScreen("home");
     });
     bind("chatBackBtn", "click", () => switchWechatView("home"));
+    bind("chatDetailName", "click", () => openCharProfile(getCurrentCharId()));
     bind("chatProfileBtn", "click", openChatProfileOverlay);
     bind("chatProfileCancelBtn", "click", closeChatProfileOverlay);
     bind("chatProfileSaveBtn", "click", saveChatProfileFromOverlay);
@@ -1801,18 +2072,30 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // 好友资料页按钮
+    bind("profileBackBtn", "click", () => switchWechatView("home"));
+    bind("profileChatBtn", "click", () => {
+        renderMessages();
+        renderConversationList();
+        updateChatDetailTitle();
+        switchWechatView("chatDetail");
+    });
+    bind("profileEditBtn", "click", openChatProfileOverlay);
+
     // 添加好友
     bind("addCharBtn", "click", () => {
         const name = ("" + ($("newCharName")?.value || "")).trim();
+        const signature = ("" + ($("newCharSignature")?.value || "")).trim();
         const persona = ("" + ($("newCharPersona")?.value || "")).trim();
-        if (!name && !persona) {
-            alert("请至少填写好友昵称或人设");
+        if (!name && !persona && !signature) {
+            alert("请至少填写好友昵称、人设或签名中的一项");
             return;
         }
         const id = "char_" + Date.now();
-        state.chars.push({ id, name: name || "未命名好友", persona });
+        state.chars.push({ id, name: name || "未命名好友", persona, signature });
         state.currentCharId = id;
         if ($("newCharName")) $("newCharName").value = "";
+        if ($("newCharSignature")) $("newCharSignature").value = "";
         if ($("newCharPersona")) $("newCharPersona").value = "";
         renderCharList();
         syncSelectors();
@@ -1903,4 +2186,40 @@ window.addEventListener("DOMContentLoaded", () => {
         updateChatDetailTitle();
 	// 默认进入微信 Tab 的首页
 	switchWechatView("home");
+
+    // 导入数据：文件选择和解析
+    const importInput = $("importFile");
+    if (importInput) {
+        importInput.addEventListener("change", (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = ev.target?.result || "";
+                importDataFromText(String(text));
+                importInput.value = "";
+            };
+            reader.readAsText(file, "utf-8");
+        });
+        bind("importDataBtn", "click", () => importInput.click());
+    }
+
+    // 消息长按操作菜单：点击空白处关闭，按钮触发具体动作
+    const msgOverlay = $("msgActionOverlay");
+    if (msgOverlay) {
+        msgOverlay.addEventListener("click", (e) => {
+            if (e.target === msgOverlay || e.target.classList.contains("msg-action-mask")) {
+                closeMessageActionOverlay();
+            }
+        });
+        const btns = msgOverlay.querySelectorAll(".msg-action-btn");
+        btns.forEach((btn) => {
+            const action = btn.getAttribute("data-action");
+            if (!action) return;
+            btn.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                handleMessageAction(action);
+            });
+        });
+    }
 });
