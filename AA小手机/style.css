@@ -1,0 +1,989 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #ededed;
+    height: 100vh;
+}
+
+.app {
+    width: 420px;
+    height: 720px;
+    margin: 16px auto;
+    display: flex;
+    flex-direction: column;
+    border-radius: 32px;
+    background: #f0f0f0;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+}
+
+.phone-header {
+    height: 48px;
+    background: #1aad19;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px 0 10px;
+    font-size: 13px;
+}
+
+.header-back {
+	border: none;
+	background: transparent;
+	color: #ffffff;
+	font-size: 18px;
+	cursor: pointer;
+	padding: 0 6px 2px;
+	visibility: hidden; /* 默认在主屏隐藏，由 JS 控制显示 */
+}
+
+.phone-header.with-back .header-back {
+	visibility: visible;
+}
+
+.phone-title {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.app-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #ececec;
+}
+
+.phone-footer {
+    height: 48px;
+    background: #f7f7f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid #dddddd;
+}
+
+.home-btn {
+    border-radius: 16px;
+    border: 1px solid #cccccc;
+    background: #ffffff;
+    padding: 4px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.screen-view {
+    flex: 1;
+    display: none;
+    /* 每个屏幕自己负责内部纵向滚动 */
+    overflow-y: auto;
+    flex-direction: column;
+}
+
+.screen-view.active {
+    display: flex;
+}
+
+.home-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: 96px;
+    place-items: center;
+    padding: 24px 16px;
+}
+
+#screenHome {
+	background: url("wallpaper.png") center center / cover no-repeat;
+}
+
+.app-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    border: none;
+    color: #fff;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.app-icon.wechat {
+    background: #1aad19;
+}
+
+.app-icon.settings {
+    background: #888888;
+}
+
+.icon-label {
+    font-size: 13px;
+}
+
+.settings {
+    width: 100%;
+    background: #fafafa;
+    padding: 12px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 8px;
+    overflow-y: auto;
+}
+
+.settings h2 {
+    font-size: 14px;
+    margin-top: 6px;
+    margin-bottom: 4px;
+    color: #111;
+}
+
+.form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.form-item span {
+    color: #555;
+}
+
+.form-item input,
+.form-item textarea,
+select {
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #d9d9d9;
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+}
+
+.form-item input:focus,
+.form-item textarea:focus,
+select:focus {
+    border-color: #1aad19;
+    box-shadow: 0 0 0 1px rgba(26, 173, 25, 0.15);
+}
+
+.tip {
+    font-size: 12px;
+    color: #888;
+}
+
+.form-row-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.inline-tip {
+    color: #999;
+}
+
+.switch-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #ececec;
+}
+
+/* 微信内部导航：微信 / 通讯录 / 设置 */
+.wechat-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.wechat-pages {
+    flex: 1;
+    display: flex;
+}
+
+.wechat-nav-tabs {
+    display: flex;
+    border-bottom: 1px solid #dcdcdc;
+    background: #f7f7f7;
+}
+
+.wechat-tab {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: #555;
+    cursor: pointer;
+}
+
+.wechat-tab.active {
+    color: #1aad19;
+    font-weight: 600;
+    border-bottom: 2px solid #1aad19;
+    background: #ffffff;
+}
+
+.wechat-view {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    /* 由内部区域自己滚动，避免整个页面出现横向/纵向滚动条挤压输入框 */
+    overflow: hidden;
+    background: #ececec;
+}
+
+.wechat-view.active {
+    display: flex;
+}
+
+/* 微信底部 Tab 栏 */
+.wechat-bottom-bar {
+    display: flex;
+    height: 52px;
+    border-top: 1px solid #dddddd;
+    background: #ffffff;
+}
+
+.wechat-bottom-item {
+    flex: 1;
+    border: none;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #666;
+    cursor: pointer;
+}
+
+.wechat-bottom-icon {
+    font-size: 16px;
+    margin-bottom: 2px;
+}
+
+.wechat-bottom-item.active {
+    color: #1aad19;
+}
+
+.chat-topbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 8px 4px;
+    background: #f7f7f7;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.selector-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    font-size: 12px;
+}
+
+.selector-group span {
+    color: #777;
+    margin-bottom: 2px;
+}
+
+.selector-group select {
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid #d9d9d9;
+    font-size: 13px;
+}
+
+.contacts,
+.wechat-settings {
+    flex: 1;
+    padding: 10px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.contact-list,
+.profile-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.contact-item,
+.profile-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+}
+
+.contact-item:last-child,
+.profile-item:last-child {
+    border-bottom: none;
+}
+
+.contact-main,
+.profile-main {
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #d8d8d8;
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: 16px;
+    color: #555;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.contact-name,
+.profile-name {
+    font-weight: 500;
+}
+
+.contact-persona,
+.profile-persona {
+    font-size: 12px;
+    color: #777;
+    margin-top: 2px;
+    max-height: 3.2em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.list-actions button {
+    font-size: 12px;
+    padding: 2px 8px;
+}
+
+.contact-form,
+.profile-form {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contact-form h3,
+.profile-form h3 {
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+.app-tabs {
+    display: flex;
+    border-bottom: 1px solid #dddddd;
+    background: #f7f7f7;
+}
+
+.app-tabs .tab {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+}
+
+.app-tabs .tab.active {
+    color: #1aad19;
+    font-weight: 500;
+    border-bottom: 2px solid #1aad19;
+    background: #ffffff;
+}
+
+.panel {
+    flex: 1;
+    display: none;
+}
+
+.panel.panel-active {
+    display: flex;
+}
+
+.panel-chat,
+.panel-feed {
+    flex-direction: column;
+}
+
+.chat-list {
+    flex: 1;
+    padding: 10px 12px 10px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 微信首页：会话列表 */
+.conversation-list {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e5e5;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.conversation-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f3f3f3;
+    cursor: pointer;
+    background: #ffffff;
+}
+
+.conversation-item:last-child {
+    border-bottom: none;
+}
+
+.conversation-item.active {
+    background: #e8f5e9;
+}
+
+.conversation-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    background: #d8d8d8;
+    margin-right: 10px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #555;
+}
+
+.conversation-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.conversation-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.conversation-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.conversation-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #111;
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.conversation-time {
+    font-size: 11px;
+    color: #999;
+}
+
+.conversation-preview {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #777;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.feed-list {
+    flex: 1;
+    padding: 10px 12px 10px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.feed-item {
+    background: #ffffff;
+    border-radius: 4px;
+    border: 1px solid #e5e5e5;
+    padding: 8px 10px;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.feed-meta {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 4px;
+}
+
+.feed-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.feed-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: #d8d8d8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-right: 8px;
+    font-size: 16px;
+    color: #555;
+}
+
+.feed-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.feed-meta-box {
+    display: flex;
+    flex-direction: column;
+}
+
+.feed-author-name {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.feed-content {
+    margin-top: 4px;
+}
+
+.feed-likes {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #e91e63;
+}
+
+.feed-comments {
+    margin-top: 4px;
+    font-size: 13px;
+}
+
+.feed-comment-row + .feed-comment-row {
+    margin-top: 2px;
+}
+
+.feed-actions {
+    margin-top: 6px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.feed-action-btn {
+    border: 1px solid #d9d9d9;
+    border-radius: 12px;
+    padding: 2px 8px;
+    background: #fafafa;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.chat-item {
+    display: flex;
+    max-width: 80%;
+}
+
+.chat-item.user {
+    margin-left: auto;
+    justify-content: flex-end;
+}
+
+.chat-item.assistant {
+    margin-right: auto;
+    justify-content: flex-start;
+}
+
+.bubble {
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.chat-item.user .bubble {
+    background: #9fe658;
+    border: 1px solid #7cc652;
+    border-top-right-radius: 0;
+}
+
+.chat-item.assistant .bubble {
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-top-left-radius: 0;
+}
+
+.meta {
+    font-size: 11px;
+    color: #999;
+    margin: 0 4px;
+}
+
+.input-area {
+    border-top: 1px solid #d5d5d5;
+    padding: 8px 10px;
+    display: flex;
+    gap: 8px;
+    background: #f5f5f5;
+}
+
+.input-area textarea {
+    flex: 1;
+    border-radius: 4px;
+    border: 1px solid #d5d5d5;
+    padding: 6px 8px;
+    resize: none;
+    font-size: 14px;
+    outline: none;
+}
+
+.input-area textarea:focus {
+    border-color: #1aad19;
+    box-shadow: 0 0 0 1px rgba(26, 173, 25, 0.15);
+}
+
+.btn {
+    border: none;
+    padding: 0 14px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.btn.primary {
+    background: #1aad19;
+    color: #fff;
+}
+
+.btn.secondary {
+    background: #ffffff;
+    color: #333;
+    border: 1px solid #d9d9d9;
+}
+
+.btn.primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+    .app {
+        width: 100%;
+        height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
+/* 微信首页整体布局：搜索条 + 会话列表 */
+.wechat-home-list {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    background: #f0f0f0;
+}
+
+.wechat-home-search {
+    margin: 8px 8px 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    font-size: 13px;
+    color: #999;
+}
+
+/* 会话列表占满剩余空间，类似微信首页 */
+.conversation-list {
+    flex: 1;
+    margin-top: 6px;
+    background: #ffffff;
+    border-top: 1px solid #e5e5e5;
+    border-bottom: 1px solid #e5e5e5;
+    max-height: none;
+    overflow-y: auto;
+}
+
+/* 聊天详情页顶部栏 */
+.chat-detail-header {
+    height: 44px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f7f7f7;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.chat-back-btn {
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: #1aad19;
+    padding: 4px 6px;
+    cursor: pointer;
+}
+
+.chat-detail-name {
+    flex: 1;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 500;
+    color: #111;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-profile-btn {
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    color: #555;
+    padding: 4px 6px;
+    cursor: pointer;
+}
+
+/* 聊天详情右上设置浮层 */
+.chat-profile-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+}
+
+.chat-profile-overlay.active {
+    display: flex;
+}
+
+.chat-profile-card {
+    width: 88%;
+    max-width: 320px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+    padding: 14px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chat-profile-card h3 {
+    font-size: 15px;
+    margin: 0 0 4px;
+}
+
+.chat-profile-card .form-item span {
+    font-size: 13px;
+}
+
+.chat-profile-card input,
+.chat-profile-card textarea,
+.chat-profile-card select {
+    font-size: 13px;
+}
+
+.chat-profile-actions {
+    margin-top: 4px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* 发现首页列表（仿微信） */
+.discover-view {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    background: #f5f5f5;
+}
+
+.discover-view.active {
+    display: flex;
+}
+
+.discover-list {
+    margin-top: 8px;
+    background: #ffffff;
+    border-top: 1px solid #e5e5e5;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.discover-item {
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.discover-item + .discover-item {
+    border-top: 1px solid #f0f0f0;
+}
+
+.discover-item-icon {
+    width: 24px;
+    font-size: 18px;
+    margin-right: 12px;
+}
+
+.discover-item-text {
+    flex: 1;
+    font-size: 14px;
+    color: #111;
+}
+
+.discover-item-extra {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    background: #d8d8d8;
+    overflow: hidden;
+}
+
+.discover-item-arrow {
+    margin-left: 8px;
+    font-size: 14px;
+    color: #ccc;
+}
+
+/* 朋友圈 / 日记子页面 */
+.moments-header {
+    position: relative;
+    padding: 10px 12px 40px;
+    background: linear-gradient(135deg, #ff9ebd, #ffc0cb);
+    color: #ffffff;
+}
+
+.moments-back {
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 14px;
+    padding: 4px 0;
+    cursor: pointer;
+}
+
+.moments-title {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.moments-camera {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 18px;
+}
+
+.moments-profile {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.moments-profile-name {
+    font-size: 14px;
+}
+
+.moments-profile-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    background: #d8d8d8;
+    overflow: hidden;
+}
+
+.moments-profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.moments-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+}
