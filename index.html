@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>AI 聊天 - 微信风格</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="app">
+        <header class="phone-header" id="phoneHeader">
+            <button id="btnHeaderBack" class="header-back" aria-label="返回主屏幕">◁</button>
+            <div class="phone-status">AA 小手机</div>
+            <div class="phone-title" id="phoneTitle">主屏幕</div>
+        </header>
+
+        <main class="app-main">
+            <!-- 主屏幕：应用图标 -->
+            <div id="screenHome" class="screen-view active">
+                <div class="home-grid">
+                    <button id="iconWechat" class="app-icon wechat">
+                        <span class="icon-label">微信</span>
+                    </button>
+                    <button id="iconSettings" class="app-icon settings">
+                        <span class="icon-label">设置</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 微信应用：仿微信分布（底部四个 Tab） -->
+            <div id="screenChat" class="screen-view">
+                <div class="wechat-shell">
+                    <div class="wechat-pages">
+                        <!-- 微信：会话列表页 -->
+                        <div id="wechatPageHome" class="wechat-view active">
+                            <div class="wechat-home-list">
+                                <div class="wechat-home-search">搜索（占位）</div>
+                                <div id="conversationList" class="conversation-list"></div>
+                            </div>
+                        </div>
+
+                        <!-- 微信：聊天详情页 -->
+                        <div id="wechatPageChat" class="wechat-view">
+                            <div class="chat-detail-header">
+                                <button id="chatBackBtn" class="chat-back-btn">〈 微信</button>
+                                <div id="chatDetailName" class="chat-detail-name"></div>
+                                <button id="chatProfileBtn" class="chat-profile-btn" title="编辑角色与人设">⋯</button>
+                            </div>
+                            <section class="chat-area">
+                                <div id="panelChat" class="panel panel-chat panel-active">
+                                    <div id="chatList" class="chat-list"></div>
+
+                                    <div class="input-area">
+                                        <textarea id="userInput" rows="2" placeholder="发送消息…（Ctrl+Enter 换行，Enter 发送）"></textarea>
+                                        <button id="sendBtn" class="btn secondary">发送</button>
+                                        <button id="askBtn" class="btn primary">让 AI 回复</button>
+                                        <button id="retryBtn" class="btn secondary">重说一次</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- 聊天详情里的角色设置面板 -->
+                            <div id="chatProfileOverlay" class="chat-profile-overlay">
+                                <div class="chat-profile-card">
+                                    <h3>编辑当前好友与人设</h3>
+                                    <label class="form-item">
+                                        <span>好友昵称</span>
+                                        <input id="chatEditName" type="text" />
+                                    </label>
+                                    <label class="form-item">
+                                        <span>头像（可以填 Emoji 或简单文字）</span>
+                                        <input id="chatEditAvatar" type="text" placeholder="例如：🐰、😺 或 https://example.com/avatar.png" />
+                                    </label>
+                                    <label class="form-item">
+                                        <span>角色人设</span>
+                                        <textarea id="chatEditPersona" rows="4" placeholder="为这个好友写一段人设说明"></textarea>
+                                    </label>
+                                    <label class="form-item">
+                                        <span>选择我的人设</span>
+                                        <select id="chatEditUserProfile"></select>
+                                    </label>
+                                    <div class="chat-profile-actions">
+                                        <button id="chatProfileCancelBtn" class="btn secondary">取消</button>
+                                        <button id="chatProfileSaveBtn" class="btn primary">保存</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                            <!-- 通讯录：多个角色（好友）的人设管理 -->
+                            <div id="wechatPageContacts" class="wechat-view">
+                        <div class="contacts">
+                            <h2>好友列表</h2>
+                            <ul id="charList" class="contact-list"></ul>
+                            <div class="contact-form">
+                                <h3>添加好友</h3>
+                                <label class="form-item">
+                                    <span>好友昵称</span>
+                                    <input id="newCharName" type="text" placeholder="例如：测试兔兔" />
+                                </label>
+                                <label class="form-item">
+                                    <span>角色人设</span>
+                                    <textarea id="newCharPersona" rows="3" placeholder="为这个好友写一段人设说明，例如性格、说话风格、身份等"></textarea>
+                                </label>
+                                <button id="addCharBtn" class="btn primary">添加好友</button>
+                            </div>
+                        </div>
+                    </div>
+
+                        <!-- 发现：仿微信发现页 + 朋友圈 / 日记子页面 -->
+                        <div id="wechatPageDiscover" class="wechat-view">
+                            <!-- 发现首页：类似微信“发现”列表 -->
+                            <div id="discoverHome" class="discover-view active">
+                                <div class="discover-list">
+                                    <button id="discoverMomentsEntry" class="discover-item">
+                                        <span class="discover-item-icon">◎</span>
+                                        <span class="discover-item-text">朋友圈</span>
+                                        <span class="discover-item-extra" id="discoverMomentsAvatar"></span>
+                                        <span class="discover-item-arrow">›</span>
+                                    </button>
+                                    <button id="discoverDiaryEntry" class="discover-item">
+                                        <span class="discover-item-icon">✎</span>
+                                        <span class="discover-item-text">日记本</span>
+                                        <span class="discover-item-arrow">›</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 朋友圈时间线页面 -->
+                            <div id="discoverMoments" class="discover-view">
+                                <div class="moments-header">
+                                    <button id="momentsBackBtn" class="moments-back">〈 发现</button>
+                                    <div class="moments-title">朋友圈</div>
+                                    <div class="moments-camera">📷</div>
+                                    <div class="moments-profile">
+                                        <div class="moments-profile-name" id="momentsProfileName">我</div>
+                                        <div class="moments-profile-avatar" id="momentsProfileAvatar"></div>
+                                    </div>
+                                </div>
+                                <div class="moments-body">
+                                    <div id="momentsList" class="feed-list"></div>
+                                    <div class="input-area">
+                                        <textarea id="momentHint" rows="2" placeholder="给角色一点灵感（可选），让 TA 用第一人称发一条朋友圈…"></textarea>
+                                        <button id="genMomentBtn" class="btn primary">让 TA 发朋友圈</button>
+                                        <button id="userMomentBtn" class="btn secondary">我发朋友圈</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 日记本页面 -->
+                            <div id="discoverDiary" class="discover-view">
+                                <div class="moments-header">
+                                    <button id="diaryBackBtn" class="moments-back">〈 发现</button>
+                                    <div class="moments-title">日记本</div>
+                                    <div class="moments-camera"></div>
+                                </div>
+                                <div class="moments-body">
+                                    <div id="diaryList" class="feed-list"></div>
+                                    <div class="input-area">
+                                        <textarea id="diaryHint" rows="2" placeholder="给今天的关键词（可选），让 TA 写一篇日记…"></textarea>
+                                        <button id="genDiaryBtn" class="btn primary">让 TA 写日记</button>
+                                    </div>
+                                    <p class="tip">后面我们可以在这里接更多 AI 小玩法，比如今日签、听一听等。</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 我：用户人设 + 自动生成开关 -->
+                        <div id="wechatPageMe" class="wechat-view">
+                        <div class="wechat-settings">
+                            <h2>我的人设</h2>
+                            <ul id="userProfileList" class="profile-list"></ul>
+                            <div class="profile-form">
+                                <h3>新增人设</h3>
+                                <label class="form-item">
+                                    <span>昵称</span>
+                                    <input id="newUserName" type="text" placeholder="例如：窝窝" />
+                                </label>
+                                <label class="form-item">
+                                    <span>头像（可以填 Emoji 或 URL）</span>
+                                    <input id="newUserAvatar" type="text" placeholder="例如：🐻 或 https://example.com/me.png" />
+                                </label>
+                                <label class="form-item">
+                                    <span>用户人设</span>
+                                    <textarea id="newUserPersona" rows="3" placeholder="为自己写一段人设说明，例如性格、生活状态、爱好等"></textarea>
+                                </label>
+                                <button id="addUserProfileBtn" class="btn primary">添加人设</button>
+                            </div>
+                            <div class="form-row-inline">
+                                <label class="switch-row">
+                                    <input id="autoMoments" type="checkbox" />
+                                    <span>聊天后自动生成一条朋友圈</span>
+                                </label>
+                            </div>
+                            <div class="form-row-inline">
+                                <label class="switch-row">
+                                    <input id="autoDiary" type="checkbox" />
+                                    <span>聊天后自动生成一篇日记</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+
+                    <!-- 底部微信 Tab 栏：微信 / 通讯录 / 发现 / 我 -->
+                    <div class="wechat-bottom-bar">
+                        <button id="wechatTabHome" class="wechat-bottom-item active">
+                            <span class="wechat-bottom-icon">●</span>
+                            <span class="wechat-bottom-label">微信</span>
+                        </button>
+                        <button id="wechatTabContacts" class="wechat-bottom-item">
+                            <span class="wechat-bottom-icon">●</span>
+                            <span class="wechat-bottom-label">通讯录</span>
+                        </button>
+                        <button id="wechatTabDiscover" class="wechat-bottom-item">
+                            <span class="wechat-bottom-icon">●</span>
+                            <span class="wechat-bottom-label">发现</span>
+                        </button>
+                        <button id="wechatTabMe" class="wechat-bottom-item">
+                            <span class="wechat-bottom-icon">●</span>
+                            <span class="wechat-bottom-label">我</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统设置应用：仅管理 API 配置 -->
+            <div id="screenSettings" class="screen-view">
+                <aside class="settings full">
+                    <h2>API 设置</h2>
+                    <label class="form-item">
+                        <span>Base URL</span>
+                        <input id="baseUrl" type="text" placeholder="默认：https://api.openai.com/v1" />
+                    </label>
+                    <label class="form-item">
+                        <span>API Key</span>
+                        <input id="apiKey" type="password" placeholder="在这里填你的 API Key" />
+                    </label>
+                    <div class="form-row-inline">
+                        <button id="fetchModelsBtn" class="btn secondary">拉取模型列表</button>
+                        <span class="inline-tip">会请求 Base URL 下的 /models 接口</span>
+                    </div>
+                    <label class="form-item">
+                        <span>选择模型</span>
+                        <select id="modelSelect"></select>
+                    </label>
+                    <label class="form-item">
+                        <span>自定义模型名（可选，优先使用）</span>
+                        <input id="modelCustom" type="text" placeholder="如果你的接口模型名和列表不一样，可在这里手动填" />
+                    </label>
+                    <h2>AI 记忆力</h2>
+                    <div class="form-row-inline">
+                        <label class="switch-row">
+                            <input id="memoryEnabled" type="checkbox" />
+                            <span>开启 AI 记忆力（自动总结聊天要点）</span>
+                        </label>
+                    </div>
+                    <label class="form-item">
+                        <span>每多少条 AI 回复后进行一次总结</span>
+                        <input id="memoryEvery" type="number" min="3" max="100" step="1" placeholder="例如：20" />
+                    </label>
+                    <button id="saveSettingsBtn" class="btn primary">保存设置（本机浏览器）</button>
+                    <p class="tip">提示：设置会保存在当前浏览器的本地存储中，不会上传到服务器。</p>
+                </aside>
+            </div>
+        </main>
+
+        <footer class="phone-footer">
+            <button id="btnHome" class="home-btn">◁ 主屏幕</button>
+        </footer>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
