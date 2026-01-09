@@ -69,6 +69,36 @@
                                 </div>
                             </section>
 
+                            <!-- 聊天详情里的角色状态栏 -->
+                            <div id="charStateOverlay" class="chat-profile-overlay">
+                                <div class="chat-profile-card">
+                                    <h3>当前好友状态</h3>
+                                    <div class="form-item">
+                                        <span>好感度</span>
+                                        <textarea id="charStateFavor" rows="2" placeholder="例如：对你的亲密度、信任感"></textarea>
+                                    </div>
+                                    <div class="form-item">
+                                        <span>心声</span>
+                                        <textarea id="charStateThoughts" rows="2" placeholder="此刻 TA 心里在想什么"></textarea>
+                                    </div>
+                                    <div class="form-item">
+                                        <span>穿着</span>
+                                        <textarea id="charStateOutfit" rows="2" placeholder="现在的服装/外观状态"></textarea>
+                                    </div>
+                                    <div class="form-item">
+                                        <span>动作</span>
+                                        <textarea id="charStateAction" rows="2" placeholder="此刻正在做什么动作/表情"></textarea>
+                                    </div>
+                                    <div class="chat-profile-actions">
+                                        <button id="charStateCloseBtn" class="btn secondary">关闭</button>
+                                        <button id="charStateAIBtn" class="btn secondary">让 AI 填写状态</button>
+                                        <button id="charStateSaveBtn" class="btn primary">保存状态并记录</button>
+                                    </div>
+                                    <h3>状态记录</h3>
+                                    <div id="charStateHistory" class="memory-log"></div>
+                                </div>
+                            </div>
+
                             <!-- 聊天详情里的角色设置面板 -->
                             <div id="chatProfileOverlay" class="chat-profile-overlay">
                                 <div class="chat-profile-card">
@@ -334,6 +364,20 @@
                                 </label>
                                 <button id="addWorldBookBtn" class="btn primary">添加世界书</button>
                                 <p class="tip">世界书会作为额外设定注入到与角色的对话中，帮助 AI 理解这个架空世界。</p>
+                            </div>
+
+                            <h2>外观与壁纸</h2>
+                            <div class="profile-form">
+                                <label class="form-item">
+                                    <span>手机主屏壁纸 URL（留空则使用默认）</span>
+                                    <input id="homeWallpaperInput" type="text" placeholder="例如：https://example.com/home.jpg" />
+                                </label>
+                                <label class="form-item">
+                                    <span>聊天背景壁纸 URL（留空则使用默认灰色背景）</span>
+                                    <input id="chatWallpaperInput" type="text" placeholder="例如：https://example.com/chat.jpg" />
+                                </label>
+                                <button id="saveWallpaperBtn" class="btn primary">保存外观设置</button>
+                                <p class="tip">目前支持填写 http(s) 或 data:image 开头的图片地址，暂不支持直接上传本地文件。</p>
                             </div>
                         </div>
                     </div>
