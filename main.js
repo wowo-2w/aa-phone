@@ -7,7 +7,9 @@ const state = {
     diary: [], // 日记列表
     // 多个角色（好友）和多个用户人设
     chars: [], // {id, name, persona}
-    userProfiles: [], // {id, name, persona}
+    userProfiles: [], // {id, name, persona, avatar}
+    // 世界书：用于存放世界观 / 规则等设定
+    worldBooks: [], // {id, name, content}
     currentCharId: null,
     currentUserProfileId: null,
     // AI 记忆
@@ -22,6 +24,8 @@ const state = {
     lastAutoDiaryMsgCount: 0,
     // 当前正在编辑的用户人设 ID（用于“我”的人设编辑）
     editingUserProfileId: null,
+    // 当前正在编辑的世界书 ID（用于“我”的世界书编辑）
+    editingWorldBookId: null,
     // 当前会话场景（默认 / 学习 / 恋爱 / 工作 等）
     currentSceneKey: "default",
 };
@@ -110,6 +114,7 @@ function loadSettings() {
         // 多角色与多用户人设
         if (Array.isArray(cfg.chars)) state.chars = cfg.chars;
         if (Array.isArray(cfg.userProfiles)) state.userProfiles = cfg.userProfiles;
+        if (Array.isArray(cfg.worldBooks)) state.worldBooks = cfg.worldBooks;
         if (cfg.currentCharId) state.currentCharId = cfg.currentCharId;
         if (cfg.currentUserProfileId) state.currentUserProfileId = cfg.currentUserProfileId;
 
@@ -189,6 +194,7 @@ function internalSaveSettings(showAlert) {
     const cfg = {
         chars: state.chars,
         userProfiles: state.userProfiles,
+        worldBooks: state.worldBooks,
         currentCharId: state.currentCharId,
         currentUserProfileId: state.currentUserProfileId,
         sessions: state.sessions,
@@ -455,6 +461,15 @@ function renderUserProfileList() {
     const list = $("userProfileList");
     if (!list) return;
     list.innerHTML = "";
+
+    if (!state.userProfiles.length) {
+        const empty = document.createElement("li");
+        empty.className = "profile-item profile-empty";
+        empty.textContent = "还没有人设，下面填写后点“添加人设”就会出现在这里";
+        list.appendChild(empty);
+        return;
+    }
+
     state.userProfiles.forEach((p) => {
         const li = document.createElement("li");
         li.className = "profile-item";
@@ -526,6 +541,77 @@ function renderUserProfileList() {
         actions.appendChild(btnDel);
 
         li.appendChild(avatarWrap);
+        li.appendChild(main);
+        li.appendChild(actions);
+        list.appendChild(li);
+    });
+}
+
+function renderWorldBookList() {
+    const list = $("worldBookList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    if (!state.worldBooks.length) {
+        const empty = document.createElement("li");
+        empty.className = "profile-item profile-empty";
+        empty.textContent = "还没有世界书，可以在下面添加一个世界观设定";
+        list.appendChild(empty);
+        return;
+    }
+
+    state.worldBooks.forEach((b) => {
+        const li = document.createElement("li");
+        li.className = "profile-item";
+
+        const main = document.createElement("div");
+        main.className = "profile-main";
+        const name = document.createElement("div");
+        name.className = "profile-name";
+        name.textContent = b.name || "未命名世界书";
+        const desc = document.createElement("div");
+        desc.className = "profile-persona";
+        const text = b.content || "";
+        desc.textContent = text ? text.slice(0, 40) + (text.length > 40 ? "…" : "") : "(还没有填写世界规则内容)";
+        main.appendChild(name);
+        main.appendChild(desc);
+
+        const actions = document.createElement("div");
+        actions.className = "list-actions";
+
+        const btnEdit = document.createElement("button");
+        btnEdit.className = "btn secondary";
+        btnEdit.textContent = "编辑";
+        btnEdit.addEventListener("click", () => {
+            state.editingWorldBookId = b.id;
+            const nameInput = $("newWorldBookName");
+            const contentInput = $("newWorldBookContent");
+            if (nameInput) nameInput.value = b.name || "";
+            if (contentInput) contentInput.value = b.content || "";
+            const btn = "addWorldBookBtn" in window ? $("addWorldBookBtn") : $("addWorldBookBtn");
+            if (btn && !btn.dataset.originalText) {
+                btn.dataset.originalText = btn.textContent || "";
+            }
+            if (btn) btn.textContent = "保存世界书修改";
+        });
+
+        const btnDel = document.createElement("button");
+        btnDel.className = "btn secondary";
+        btnDel.textContent = "删除";
+        btnDel.addEventListener("click", () => {
+            state.worldBooks = state.worldBooks.filter((x) => x.id !== b.id);
+            if (state.chars && state.chars.length) {
+                state.chars.forEach((c) => {
+                    if (c.worldBookId === b.id) delete c.worldBookId;
+                });
+            }
+            renderWorldBookList();
+            saveSettings();
+        });
+
+        actions.appendChild(btnEdit);
+        actions.appendChild(btnDel);
+
         li.appendChild(main);
         li.appendChild(actions);
         list.appendChild(li);
@@ -1409,6 +1495,9 @@ async function sendToAI() {
     const currentChar = state.chars.find((c) => c.id === state.currentCharId) || null;
     const currentUser =
         state.userProfiles.find((p) => p.id === state.currentUserProfileId) || null;
+    const currentWorldBook = currentChar?.worldBookId
+        ? state.worldBooks.find((b) => b.id === currentChar.worldBookId) || null
+        : null;
 
     const baseUrl =
         (currentChar && currentChar.baseUrl && currentChar.baseUrl.trim()) ||
@@ -1463,6 +1552,9 @@ async function sendToAI() {
         }
         if (sceneCfg && sceneCfg.key !== "default" && sceneCfg.prompt) {
             content += `\n\n当前会话处于场景「${sceneCfg.name}」，请根据下面的场景说明调整你的表现：${sceneCfg.prompt}`;
+        }
+        if (currentWorldBook && currentWorldBook.content) {
+            content += `\n\n以下是本次对话所属的世界观设定，请在回答时严格遵守这些世界规则：\n${currentWorldBook.content}`;
         }
         messages.push({ role: "system", content });
     }
@@ -2088,6 +2180,7 @@ function openChatProfileOverlay() {
     const modelInput = $("chatEditModel");
     const tempInput = $("chatEditTemperature");
     const styleInput = $("chatEditStyle");
+    const worldSelect = $("chatEditWorldBook");
     if (nameInput) nameInput.value = currentChar?.name || "";
     if (avatarInput)
         avatarInput.value = (currentChar?.avatar && String(currentChar.avatar)) || "";
@@ -2102,6 +2195,23 @@ function openChatProfileOverlay() {
                 ? String(currentChar.temperature)
                 : "";
     if (styleInput) styleInput.value = currentChar?.stylePrompt || "";
+
+    if (worldSelect) {
+        worldSelect.innerHTML = "";
+        const optNone = document.createElement("option");
+        optNone.value = "";
+        optNone.textContent = "（不使用世界书）";
+        worldSelect.appendChild(optNone);
+        state.worldBooks.forEach((b) => {
+            const opt = document.createElement("option");
+            opt.value = b.id;
+            opt.textContent = b.name || "未命名世界书";
+            worldSelect.appendChild(opt);
+        });
+        if (currentChar?.worldBookId) {
+            worldSelect.value = currentChar.worldBookId;
+        }
+    }
 
     const userSelect = $("chatEditUserProfile");
     if (userSelect) {
@@ -2145,6 +2255,7 @@ function saveChatProfileFromOverlay() {
     const tempInput = $("chatEditTemperature");
     const styleInput = $("chatEditStyle");
     const userSelect = $("chatEditUserProfile");
+    const worldSelect = $("chatEditWorldBook");
 
     const name = nameInput ? nameInput.value.trim() : "";
     const avatar = avatarInput ? avatarInput.value.trim() : "";
@@ -2168,6 +2279,8 @@ function saveChatProfileFromOverlay() {
         if (!Number.isNaN(temperature)) ch.temperature = temperature;
         else delete ch.temperature;
         ch.stylePrompt = stylePrompt || undefined;
+        if (worldSelect && worldSelect.value) ch.worldBookId = worldSelect.value;
+        else delete ch.worldBookId;
     }
 
     if (userSelect && userSelect.value) {
@@ -2818,6 +2931,36 @@ window.addEventListener("DOMContentLoaded", () => {
         saveSettings();
     });
 
+    // 添加 / 编辑世界书
+    bind("addWorldBookBtn", "click", () => {
+        const name = ("" + ($("newWorldBookName")?.value || "")).trim();
+        const content = ("" + ($("newWorldBookContent")?.value || "")).trim();
+        if (!name && !content) {
+            alert("请至少填写世界书名称或内容");
+            return;
+        }
+        const btn = $("addWorldBookBtn");
+        if (state.editingWorldBookId) {
+            const idx = state.worldBooks.findIndex((b) => b.id === state.editingWorldBookId);
+            if (idx >= 0) {
+                const b = state.worldBooks[idx];
+                b.name = name || b.name || "未命名世界书";
+                b.content = content;
+            }
+            state.editingWorldBookId = null;
+        } else {
+            const id = "world_" + Date.now();
+            state.worldBooks.push({ id, name: name || "未命名世界书", content });
+        }
+        if ($("newWorldBookName")) $("newWorldBookName").value = "";
+        if ($("newWorldBookContent")) $("newWorldBookContent").value = "";
+        if (btn && btn.dataset.originalText) {
+            btn.textContent = btn.dataset.originalText;
+        }
+        renderWorldBookList();
+        saveSettings();
+    });
+
     // 下拉切换当前好友 / 人设
     const charSelect = $("chatCharSelect");
     if (charSelect) {
@@ -2855,6 +2998,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     renderCharList();
     renderUserProfileList();
+    renderWorldBookList();
     syncSelectors();
 	renderConversationList();
         updateChatDetailTitle();

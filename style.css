@@ -11,14 +11,16 @@ body {
 }
 
 .app {
-    width: 420px;
-    height: 720px;
-    margin: 16px auto;
+    width: 100%;
+    max-width: 480px;
+    height: 88vh;
+    max-height: 720px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
-    border-radius: 32px;
+    border-radius: 24px;
     background: #f0f0f0;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     overflow: hidden;
 }
 
@@ -165,7 +167,7 @@ select {
     padding: 6px 8px;
     border-radius: 4px;
     border: 1px solid #d9d9d9;
-    font-size: 13px;
+    font-size: 16px;
     outline: none;
     resize: vertical;
 }
@@ -340,6 +342,7 @@ select:focus {
     border-radius: 6px;
     background: #ffffff;
     border: 1px solid #e5e5e5;
+    min-height: 48px;
     max-height: 200px;
     overflow-y: auto;
 }
@@ -352,6 +355,12 @@ select:focus {
     padding: 6px 8px;
     border-bottom: 1px solid #f0f0f0;
     font-size: 13px;
+}
+
+.profile-item.profile-empty {
+    justify-content: center;
+    color: #999;
+    border-bottom: none;
 }
 
 .contact-item:last-child,

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <title>AI 聊天 - 微信风格</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -104,6 +104,10 @@
                                     <label class="form-item">
                                         <span>说话风格 / 语气提示</span>
                                         <textarea id="chatEditStyle" rows="3" placeholder="例如：像恋爱向聊天、像温柔老师、像严肃教练等"></textarea>
+                                    </label>
+                                    <label class="form-item">
+                                        <span>选择世界书（可选）</span>
+                                        <select id="chatEditWorldBook"></select>
                                     </label>
                                     <label class="form-item">
                                         <span>选择我的人设</span>
@@ -314,6 +318,22 @@
                                     <button id="clearMemorySummaryBtn" class="btn secondary">一键清空记忆</button>
                                 </div>
                                 <p class="tip">清空记忆会让 AI 忘记之前自动总结的长期信息，但不会删除聊天记录本身。</p>
+                            </div>
+
+                            <h2>世界书（世界观设定）</h2>
+                            <ul id="worldBookList" class="profile-list"></ul>
+                            <div class="profile-form">
+                                <h3>新增世界书</h3>
+                                <label class="form-item">
+                                    <span>世界书名称</span>
+                                    <input id="newWorldBookName" type="text" placeholder="例如：架空都市·夜之城" />
+                                </label>
+                                <label class="form-item">
+                                    <span>世界规则 / 关键设定</span>
+                                    <textarea id="newWorldBookContent" rows="4" placeholder="例如：世界观规则、阵营设定、禁忌、破甲词、常见地名与组织等"></textarea>
+                                </label>
+                                <button id="addWorldBookBtn" class="btn primary">添加世界书</button>
+                                <p class="tip">世界书会作为额外设定注入到与角色的对话中，帮助 AI 理解这个架空世界。</p>
                             </div>
                         </div>
                     </div>
